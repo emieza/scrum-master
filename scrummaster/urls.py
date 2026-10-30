@@ -13,8 +13,8 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
-    path("djrichtextfield/", include("djrichtextfield.urls")),
-    path("accounts/", include("django.contrib.auth.urls")),
+    path("ckeditor5/", include("django_ckeditor_5.urls")),
+    path("accounts/", include("allauth.urls")),
     path("", include("scrum.urls")),
 ]
 

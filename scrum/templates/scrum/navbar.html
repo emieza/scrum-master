@@ -13,7 +13,7 @@
             <li><a href="/admin/"><i class="material-icons left">view_list</i>Administració</a></li>
           {% endif %}
           <li>
-            <form method="post" action="{% url 'logout' %}" style="display:inline">
+            <form method="post" action="{% url 'account_logout' %}" style="display:inline">
               {% csrf_token %}
               <button type="submit" class="white-text" style="background:none;border:0;cursor:pointer;height:64px;padding:0 15px;font-size:0.95rem;">
                 <i class="material-icons left">person</i>{{ user.nom_complert|default:user.email }}
@@ -21,7 +21,8 @@
             </form>
           </li>
         {% else %}
-          <li><a href="{% url 'login' %}"><i class="material-icons left">person</i>Entra</a></li>
+          <li><a href="{% url 'account_signup' %}"><i class="material-icons left">person_add</i>Registra't</a></li>
+          <li><a href="{% url 'account_login' %}"><i class="material-icons left">person</i>Entra</a></li>
         {% endif %}
       </ul>
 
@@ -33,7 +34,7 @@
             <li><a href="/admin/"><i class="material-icons">view_list</i>Administració</a></li>
           {% endif %}
           <li>
-            <form method="post" action="{% url 'logout' %}">
+            <form method="post" action="{% url 'account_logout' %}">
               {% csrf_token %}
               <button type="submit" class="sidenav-close" style="background:none;border:0;cursor:pointer;color:#000;display:block;font-size:14px;font-weight:500;height:48px;line-height:48px;padding:0 32px;width:100%;text-align:left;">
                 <i class="material-icons">open_in_new</i>Surt
@@ -41,7 +42,8 @@
             </form>
           </li>
         {% else %}
-          <li><a href="{% url 'login' %}"><i class="material-icons">person</i>Entra</a></li>
+          <li><a href="{% url 'account_signup' %}"><i class="material-icons">person_add</i>Registra't</a></li>
+          <li><a href="{% url 'account_login' %}"><i class="material-icons">person</i>Entra</a></li>
         {% endif %}
       </ul>
     </div>

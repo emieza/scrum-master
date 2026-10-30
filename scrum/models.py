@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 from django.utils.safestring import mark_safe
-from djrichtextfield.models import RichTextField
+from django_ckeditor_5.fields import CKEditor5Field
 
 
 class User(AbstractUser):
@@ -67,8 +67,10 @@ class Cicle(models.Model):
     """Cicle formatiu (grau mitjà o grau superior)."""
 
     GRAU = (
+        ("CFGB", "Grau Bàsic"),
         ("CFGM", "Grau Mitjà"),
         ("CFGS", "Grau Superior"),
+        ("CE", "Curs d'Especialització"),
     )
 
     class Meta:
@@ -86,7 +88,7 @@ class Cicle(models.Model):
     descripcio = models.TextField(blank=True)
 
     def __str__(self):
-        return self.nom
+        return self.grau + " "+ self.nom
 
 
 class Centre(models.Model):
@@ -132,26 +134,8 @@ class ModulProfessional(models.Model):
     )
 
     def __str__(self):
-        return self.nom
-
-
-class UnitatFormativa(models.Model):
-    """Unitat formativa d'un mòdul professional."""
-
-    class Meta:
-        verbose_name = "unitat formativa"
-        verbose_name_plural = "unitats formatives"
-        ordering = ["mp", "numero", "nom"]
-
-    numero = models.IntegerField(default=0)
-    nom = models.CharField(max_length=255)
-    descripcio = models.TextField(blank=True)
-    mp = models.ForeignKey(
-        ModulProfessional, on_delete=models.CASCADE, related_name="unitats"
-    )
-
-    def __str__(self):
-        return self.nom
+        num = self.numero
+        return f"{num:04d}" + " " +self.nom
 
 
 class Projecte(models.Model):
@@ -163,8 +147,9 @@ class Projecte(models.Model):
         ordering = ["-inici"]
 
     nom = models.CharField(max_length=255)
-    descripcio = RichTextField(blank=True)
-    centre = models.ForeignKey(Centre, on_delete=models.CASCADE, related_name="projectes")
+    descripcio = CKEditor5Field(blank=True)
+    centre = models.ForeignKey(Centre, on_delete=models.CASCADE,
+        related_name="projectes", blank=True, null=True)
     admins = models.ManyToManyField(
         User,
         blank=True,
@@ -266,7 +251,7 @@ class Spec(models.Model):
         ordering = ["ordre", "id"]
 
     nom = models.CharField(max_length=600)
-    descripcio = RichTextField(blank=True)
+    descripcio = CKEditor5Field(blank=True)
     pare = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,

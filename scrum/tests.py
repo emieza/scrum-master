@@ -1,9 +1,12 @@
 import datetime
+from unittest.mock import Mock
 
-from django.test import TestCase
+from allauth.account.models import EmailAddress
+from django.test import TestCase, override_settings
 from django.urls import reverse
-from djrichtextfield.widgets import RichTextWidget
+from django_ckeditor_5.widgets import CKEditor5Widget
 
+from .adapters import SocialAccountAdapter
 from .models import (
     Categoria,
     Centre,
@@ -84,6 +87,82 @@ class ScrumTests(TestCase):
             )
         )
 
+    def test_pagina_entrada(self):
+        response = self.client.get(reverse("account_login"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Entra al portal")
+        self.assertContains(response, 'name="login"')
+
+    def test_login_amb_email_amb_allauth(self):
+        response = self.client.post(
+            reverse("account_login"),
+            {"login": "profe@example.cat", "password": "contrasenya123"},
+        )
+        self.assertRedirects(response, reverse("home"))
+
+    def test_registre_amb_email_qualsevol(self):
+        response = self.client.post(
+            reverse("account_signup"),
+            {
+                "email": "alumne@example.com",
+                "password1": "contrasenya-segura-123",
+                "password2": "contrasenya-segura-123",
+            },
+        )
+        self.assertRedirects(response, reverse("home"))
+        user = User.objects.get(email="alumne@example.com")
+        self.assertTrue(user.username)
+        self.assertTrue(user.check_password("contrasenya-segura-123"))
+        self.assertTrue(
+            EmailAddress.objects.filter(
+                user=user, email="alumne@example.com"
+            ).exists()
+        )
+        self.assertEqual(
+            self.client.session["_auth_user_id"], str(user.pk)
+        )
+
+    @override_settings(
+        SOCIALACCOUNT_PROVIDERS={
+            "google": {"APP": {"client_id": "google-id", "secret": "google-secret"}},
+            "microsoft": {
+                "APP": {"client_id": "microsoft-id", "secret": "microsoft-secret"}
+            },
+            "github": {"APP": {"client_id": "github-id", "secret": "github-secret"}},
+        }
+    )
+    def test_pagina_entrada_mostra_proveidors_configurats(self):
+        response = self.client.get(reverse("account_login"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Continua amb Google")
+        self.assertContains(response, "Continua amb Microsoft")
+        self.assertContains(response, "Continua amb GitHub")
+
+    @override_settings(SOCIALACCOUNT_PROVIDERS={})
+    def test_pagina_entrada_amaga_proveidors_no_configurats(self):
+        response = self.client.get(reverse("account_login"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Continua amb Google")
+        self.assertNotContains(response, "Continua amb Microsoft")
+        self.assertNotContains(response, "Continua amb GitHub")
+
+    def test_social_login_connecta_amb_email_verificat(self):
+        address = EmailAddress.objects.create(
+            user=self.user,
+            email=self.user.email,
+            primary=True,
+            verified=False,
+        )
+        verified_address = Mock(email=self.user.email, verified=True)
+        sociallogin = Mock(
+            is_existing=False,
+            email_addresses=[verified_address],
+        )
+        SocialAccountAdapter().pre_social_login(None, sociallogin)
+        address.refresh_from_db()
+        self.assertTrue(address.verified)
+        sociallogin.connect.assert_called_once_with(None, self.user)
+
     def test_qualifica_requereix_login(self):
         response = self.client.get(reverse("qualifica"))
         self.assertEqual(response.status_code, 302)
@@ -120,21 +199,18 @@ class ScrumTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="id_descripcio"')
-        self.assertContains(response, "djrichtextfield")
-        self.assertContains(response, "ckeditor.js")
-        self.assertContains(response, reverse("djrichtextfield_init"))
-        init = self.client.get(reverse("djrichtextfield_init"))
-        self.assertEqual(init.status_code, 200)
-        self.assertContains(init, "CKEDITOR.replace")
+        self.assertContains(response, "django_ckeditor_5")
+        self.assertContains(response, "django_ckeditor_5/dist/bundle.js")
+        self.assertContains(response, "django_ckeditor_5/dist/styles.css")
 
     def test_descripcions_amb_editor_enriquit(self):
         self.assertIsInstance(
             Projecte._meta.get_field("descripcio").formfield().widget,
-            RichTextWidget,
+            CKEditor5Widget,
         )
         self.assertIsInstance(
             Spec._meta.get_field("descripcio").formfield().widget,
-            RichTextWidget,
+            CKEditor5Widget,
         )
 
     def test_autocomplete_sprints_filtrat_per_projecte(self):

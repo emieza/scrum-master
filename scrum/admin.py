@@ -19,7 +19,6 @@ from .models import (
     Spec,
     SpecFeedback,
     Sprint,
-    UnitatFormativa,
     User,
 )
 
@@ -85,11 +84,13 @@ class SpecInline(SortableStackedInline):
             and db_field.name in ("mp", "sprints")
             and isinstance(formfield.widget, AutocompleteSelectMultiple)
         ):
+            attrs = dict(formfield.widget.attrs)
+            attrs["style"] = "width: 40em"
             formfield.widget = ProjecteAutocompleteSelectMultiple(
                 db_field,
                 self.admin_site,
                 projecte.id,
-                attrs=formfield.widget.attrs,
+                attrs=attrs,
                 choices=formfield.choices,
             )
         return formfield
@@ -117,6 +118,13 @@ class ProjecteAdmin(SortableAdminBase, admin.ModelAdmin):
     save_on_top = True
     date_hierarchy = "inici"
     list_select_related = ("centre", "cicle")
+    autocomplete_fields = ("cicle",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "cicle":
+            formfield.widget.attrs["style"] = "width: 40em"
+        return formfield
 
     def total_hores(self, obj):
         return "{:.0f}".format(sum(spec.hores_estimades or 0 for spec in obj.specs.all()))
@@ -332,7 +340,7 @@ class CicleAdmin(admin.ModelAdmin):
     model = Cicle
     list_display = ("codi", "nom", "grau", "familia")
     list_filter = ("grau", "familia")
-    search_fields = ("codi", "nom")
+    search_fields = ("codi", "nom","familia__nom")
     inlines = [ModulProfessionalInline]
     save_on_top = True
 
@@ -349,13 +357,6 @@ class ModulProfessionalAdmin(admin.ModelAdmin):
     list_filter = ("cicle",)
     search_fields = ("nom", "cicle__nom")
     ordering = ("cicle", "numero")
-
-
-class UnitatFormativaAdmin(admin.ModelAdmin):
-    model = UnitatFormativa
-    list_display = ("numero", "nom", "mp")
-    list_filter = ("mp__cicle",)
-    search_fields = ("nom", "mp__nom")
 
 
 class UserAdmin(BaseUserAdmin):
@@ -394,7 +395,6 @@ admin.site.register(Categoria, CategoriaAdmin)
 admin.site.register(Cicle, CicleAdmin)
 admin.site.register(Centre, CentreAdmin)
 admin.site.register(ModulProfessional, ModulProfessionalAdmin)
-admin.site.register(UnitatFormativa, UnitatFormativaAdmin)
 admin.site.register(Projecte, ProjecteAdmin)
 admin.site.register(Equip, EquipAdmin)
 admin.site.register(Sprint, SprintAdmin)
