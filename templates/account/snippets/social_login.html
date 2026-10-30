@@ -1,0 +1,13 @@
+{% load socialaccount %}
+{% get_providers as socialaccount_providers %}
+{% if socialaccount_providers %}
+  <div class="social-login">
+    <p class="grey-text center">O continua amb</p>
+    {% for provider in socialaccount_providers %}
+      {% provider_login_url provider process="login" as provider_login_url %}
+      <a class="btn waves-effect waves-light {% if provider.id == 'google' %}red{% elif provider.id == 'microsoft' %}blue{% else %}grey darken-4{% endif %}" href="{{ provider_login_url }}" style="width: 100%; margin-bottom: 0.75rem;">
+        <i class="material-icons left">account_circle</i>Continua amb {{ provider.name }}
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}

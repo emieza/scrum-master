@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Registra't · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row" style="margin-top: 3rem;">
+    <div class="col s12 m8 offset-m2 l6 offset-l3">
+      <div class="card">
+        <div class="card-content">
+          <span class="card-title">Crea un compte</span>
+
+          {% if form.non_field_errors %}
+            <div class="card-panel red lighten-4">
+              {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+
+          <form method="post" action="{% url 'account_signup' %}">
+            {% csrf_token %}
+            <div class="input-field">
+              <input type="email" name="{{ form.email.html_name }}" id="{{ form.email.id_for_label }}" value="{{ form.email.value|default_if_none:'' }}" autocomplete="email" required autofocus>
+              <label for="{{ form.email.id_for_label }}" class="active">Correu electrònic</label>
+              {% for error in form.email.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="input-field">
+              <input type="password" name="{{ form.password1.html_name }}" id="{{ form.password1.id_for_label }}" autocomplete="new-password" required>
+              <label for="{{ form.password1.id_for_label }}">Contrasenya</label>
+              {% for error in form.password1.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="input-field">
+              <input type="password" name="{{ form.password2.html_name }}" id="{{ form.password2.id_for_label }}" autocomplete="new-password" required>
+              <label for="{{ form.password2.id_for_label }}">Repeteix la contrasenya</label>
+              {% for error in form.password2.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
+            </div>
+            {% if redirect_field_value %}
+              <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+            {% endif %}
+            <div style="margin-bottom: 1.5rem;">
+              <button class="btn waves-effect waves-light light-blue" type="submit">
+                Registra't
+              </button>
+            </div>
+          </form>
+
+          {% include "account/snippets/social_login.html" %}
+
+          <p class="center">Ja tens compte? <a href="{% url 'account_login' %}">Entra</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

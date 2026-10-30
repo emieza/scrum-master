@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Entra · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row" style="margin-top: 3rem;">
+    <div class="col s12 m8 offset-m2 l6 offset-l3">
+      <div class="card">
+        <div class="card-content">
+          <span class="card-title">Entra al portal</span>
+
+          {% if form.non_field_errors %}
+            <div class="card-panel red lighten-4">
+              {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+
+          <form method="post" action="{% url 'account_login' %}">
+            {% csrf_token %}
+            <div class="input-field">
+              <input type="email" name="{{ form.login.html_name }}" id="{{ form.login.id_for_label }}" value="{{ form.login.value|default_if_none:'' }}" autocomplete="email" required autofocus>
+              <label for="{{ form.login.id_for_label }}" class="active">Correu electrònic</label>
+              {% for error in form.login.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="input-field">
+              <input type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}" autocomplete="current-password" required>
+              <label for="{{ form.password.id_for_label }}">Contrasenya</label>
+              {% for error in form.password.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
+            </div>
+            {% if redirect_field_value %}
+              <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+            {% endif %}
+            <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+              <button class="btn waves-effect waves-light light-blue" type="submit">
+                Entra
+              </button>
+              <a href="{% url 'account_reset_password' %}">Has oblidat la contrasenya?</a>
+            </div>
+          </form>
+
+          {% include "account/snippets/social_login.html" %}
+
+          <p class="center">No tens compte? <a href="{% url 'account_signup' %}">Registra't</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
