@@ -62,7 +62,7 @@ class ProjecteAutocompleteSelectMultiple(AutocompleteSelectMultiple):
 class SpecInline(SortableStackedInline):
     model = Spec
     extra = 1
-    fields = ("nom", "ordre", "mp", "hores_estimades", "sprints")
+    fields = ("nom", "ordre", "mp", "hores_estimades", "sprints", "descripcio")
     autocomplete_fields = ("mp", "sprints")
     ordering = ("ordre",)
 
@@ -82,7 +82,7 @@ class SpecInline(SortableStackedInline):
         formfield = super().formfield_for_manytomany(db_field, request, **kwargs)
         if (
             projecte
-            and db_field.name == "mp"
+            and db_field.name in ("mp", "sprints")
             and isinstance(formfield.widget, AutocompleteSelectMultiple)
         ):
             formfield.widget = ProjecteAutocompleteSelectMultiple(
@@ -97,6 +97,10 @@ class SpecInline(SortableStackedInline):
 
 class ProjecteAdmin(SortableAdminBase, admin.ModelAdmin):
     model = Projecte
+
+    class Media:
+        css = {"all": ("css/admin_collapse_specs.css",)}
+        js = ("js/admin_collapse_specs.js",)
     list_display = (
         "nom",
         "centre",

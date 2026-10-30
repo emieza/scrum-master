@@ -1,0 +1,11 @@
+#specs-group .inline-related.spec-collapsed > fieldset.module.aligned {
+  display: none;
+}
+
+#specs-group .inline-related > h3 .spec-collapse-toggle {
+  float: right;
+  margin-right: 1rem;
+  color: #666;
+  font-weight: normal;
+  font-size: 0.6875rem;
+}

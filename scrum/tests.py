@@ -2,6 +2,7 @@ import datetime
 
 from django.test import TestCase
 from django.urls import reverse
+from djrichtextfield.widgets import RichTextWidget
 
 from .models import (
     Categoria,
@@ -94,3 +95,77 @@ class ScrumTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Projecte de prova")
+
+    def test_admin_projecte_te_boto_per_colapsar_specs(self):
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save()
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("admin:scrum_projecte_change", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Col·lapsa totes les specs")
+        self.assertContains(response, "js/admin_collapse_specs.js")
+        self.assertContains(response, "css/admin_collapse_specs.css")
+        self.assertContains(response, 'id="id_specs-0-descripcio"')
+
+    def test_admin_projecte_descripcio_amb_editor_enriquit(self):
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save()
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("admin:scrum_projecte_change", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_descripcio"')
+        self.assertContains(response, "djrichtextfield")
+        self.assertContains(response, "ckeditor.js")
+        self.assertContains(response, reverse("djrichtextfield_init"))
+        init = self.client.get(reverse("djrichtextfield_init"))
+        self.assertEqual(init.status_code, 200)
+        self.assertContains(init, "CKEDITOR.replace")
+
+    def test_descripcions_amb_editor_enriquit(self):
+        self.assertIsInstance(
+            Projecte._meta.get_field("descripcio").formfield().widget,
+            RichTextWidget,
+        )
+        self.assertIsInstance(
+            Spec._meta.get_field("descripcio").formfield().widget,
+            RichTextWidget,
+        )
+
+    def test_autocomplete_sprints_filtrat_per_projecte(self):
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save()
+        self.client.force_login(self.user)
+        altre_projecte = Projecte.objects.create(
+            nom="Altre projecte",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        Sprint.objects.create(
+            nom="Sprint extern",
+            projecte=altre_projecte,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=7),
+        )
+        response = self.client.get(
+            reverse("admin:autocomplete"),
+            {
+                "app_label": "scrum",
+                "model_name": "spec",
+                "field_name": "sprints",
+                "term": "Sprint",
+                "projecte_id": self.projecte.id,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        textos = [resultat["text"] for resultat in response.json()["results"]]
+        self.assertIn("Sprint 1", textos)
+        self.assertNotIn("Sprint extern", textos)

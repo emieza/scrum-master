@@ -21,11 +21,11 @@ from .models import (
 
 
 class ProjecteAutocompleteJsonView(AutocompleteJsonView):
-    """Limita els MPs de les specs a aquells del cicle del projecte."""
+    """Limita els MPs i els sprints de les specs al projecte triat."""
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if self.model_admin.model is not ModulProfessional:
+        if self.model_admin.model not in (ModulProfessional, Sprint):
             return qs
 
         projecte_id = self.request.GET.get("projecte_id")
@@ -35,6 +35,9 @@ class ProjecteAutocompleteJsonView(AutocompleteJsonView):
         projecte = Projecte.objects.filter(pk=projecte_id).first()
         if projecte is None:
             return qs.none()
+
+        if self.model_admin.model is Sprint:
+            return qs.filter(projecte=projecte)
         return qs.filter(Q(cicle=projecte.cicle) | Q(cicle__isnull=True))
 
 

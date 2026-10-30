@@ -13,6 +13,7 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
+    path("djrichtextfield/", include("djrichtextfield.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("scrum.urls")),
 ]

@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 from django.utils.safestring import mark_safe
+from djrichtextfield.models import RichTextField
 
 
 class User(AbstractUser):
@@ -162,7 +163,7 @@ class Projecte(models.Model):
         ordering = ["-inici"]
 
     nom = models.CharField(max_length=255)
-    descripcio = models.TextField(blank=True)
+    descripcio = RichTextField(blank=True)
     centre = models.ForeignKey(Centre, on_delete=models.CASCADE, related_name="projectes")
     admins = models.ManyToManyField(
         User,
@@ -265,7 +266,7 @@ class Spec(models.Model):
         ordering = ["ordre", "id"]
 
     nom = models.CharField(max_length=600)
-    descripcio = models.TextField(blank=True)
+    descripcio = RichTextField(blank=True)
     pare = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,

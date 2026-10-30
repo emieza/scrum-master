@@ -22,8 +22,27 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "adminsortable2",
+    "djrichtextfield",
     "scrum",
 ]
+
+DJRICHTEXTFIELD_CONFIG = {
+    "js": ["https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"],
+    "init_template": "djrichtextfield/init/ckeditor.js",
+    "settings": {
+        "toolbar": [
+            ["Bold", "Italic", "Underline", "Strike"],
+            ["NumberedList", "BulletedList", "-", "Outdent", "Indent"],
+            ["JustifyLeft", "JustifyCenter", "JustifyRight"],
+            ["Link", "Unlink", "Anchor"],
+            ["Image", "Table", "HorizontalRule"],
+            ["TextColor", "BGColor"],
+            ["Maximize", "Source"],
+        ],
+        "width": "100%",
+        "height": 260,
+    },
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
