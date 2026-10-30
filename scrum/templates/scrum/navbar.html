@@ -1,0 +1,49 @@
+<div class="navbar-fixed">
+  <nav class="light-blue lighten-1" role="navigation">
+    <div class="nav-wrapper container">
+      <a href="{% url 'home' %}" class="brand-logo">Scrum Master</a>
+      <a href="#" data-target="nav-mobile" class="sidenav-trigger"><i class="material-icons">menu</i></a>
+
+      <ul class="right hide-on-med-and-down">
+        <li><a href="{% url 'projectes' %}"><i class="material-icons left">remove_red_eye</i>Projectes</a></li>
+
+        {% if user.is_authenticated %}
+          {% if user.is_superuser or user.is_staff %}
+            <li><a href="{% url 'qualifica' %}"><i class="material-icons left">task_alt</i>Qualifica</a></li>
+            <li><a href="/admin/"><i class="material-icons left">view_list</i>Administració</a></li>
+          {% endif %}
+          <li>
+            <form method="post" action="{% url 'logout' %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="white-text" style="background:none;border:0;cursor:pointer;height:64px;padding:0 15px;font-size:0.95rem;">
+                <i class="material-icons left">person</i>{{ user.nom_complert|default:user.email }}
+              </button>
+            </form>
+          </li>
+        {% else %}
+          <li><a href="{% url 'login' %}"><i class="material-icons left">person</i>Entra</a></li>
+        {% endif %}
+      </ul>
+
+      <ul id="nav-mobile" class="sidenav">
+        <li><a href="{% url 'projectes' %}"><i class="material-icons">remove_red_eye</i>Projectes</a></li>
+        {% if user.is_authenticated %}
+          {% if user.is_superuser or user.is_staff %}
+            <li><a href="{% url 'qualifica' %}"><i class="material-icons">task_alt</i>Qualifica</a></li>
+            <li><a href="/admin/"><i class="material-icons">view_list</i>Administració</a></li>
+          {% endif %}
+          <li>
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button type="submit" class="sidenav-close" style="background:none;border:0;cursor:pointer;color:#000;display:block;font-size:14px;font-weight:500;height:48px;line-height:48px;padding:0 32px;width:100%;text-align:left;">
+                <i class="material-icons">open_in_new</i>Surt
+              </button>
+            </form>
+          </li>
+        {% else %}
+          <li><a href="{% url 'login' %}"><i class="material-icons">person</i>Entra</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </nav>
+</div>

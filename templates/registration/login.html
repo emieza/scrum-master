@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Entra · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row" style="margin-top: 3rem;">
+    <div class="col s12 m8 offset-m2 l6 offset-l3">
+      <div class="card">
+        <div class="card-content">
+          <span class="card-title">Entra al portal</span>
+
+          {% if form.errors %}
+            <div class="card-panel red lighten-4">
+              Usuari o contrasenya incorrectes. Torna-ho a provar.
+            </div>
+          {% endif %}
+
+          <form method="post">
+            {% csrf_token %}
+            <div class="input-field">
+              <input type="email" name="username" id="id_username" autocomplete="username" required autofocus>
+              <label for="id_username">Correu electrònic</label>
+            </div>
+            <div class="input-field">
+              <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+              <label for="id_password">Contrasenya</label>
+            </div>
+            <input type="hidden" name="next" value="{{ next }}">
+            <button class="btn waves-effect waves-light light-blue" type="submit">
+              Entra
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

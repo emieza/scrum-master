@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Qualifica projectes · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Qualifica projectes Scrum</h2>
+
+    <form method="get">
+      <div class="input-field col s12 m6">
+        <select name="projecte_id" id="projecte" onchange="this.form.submit()">
+          <option value="">--- tria un projecte ---</option>
+          {% for proj in projectes %}
+            <option value="{{ proj.id }}" {% if projecte and proj.id == projecte.id %}selected{% endif %}>
+              {{ proj.nom }}
+            </option>
+          {% endfor %}
+        </select>
+        <label>Projecte</label>
+      </div>
+    </form>
+  </div>
+
+  {% if projecte %}
+    <div class="section">
+      <h4>Projecte: {{ projecte.nom }}</h4>
+      <label>
+        <input type="checkbox" id="toggle_members" onclick="toggle_members()">
+        <span>Mostrar / amagar membres</span>
+      </label>
+      <a class="waves-effect waves-light right light-blue btn" href="{% url 'descarrega_qualificacions' projecte.id %}">
+        <i class="material-icons left">file_download</i>Descarrega CSV
+      </a>
+
+      <div class="clearfix"></div>
+
+      {% for equip in projecte.equips.all %}
+        <div class="row" style="margin-top: 1.5rem;">
+          <div class="col s12 m8">
+            <h5>{{ equip.nom }}</h5>
+            <div class="hide membersbox">
+              {% for membre in equip.membres.all %}
+                &nbsp;&nbsp;&nbsp;&nbsp;{{ membre.email }}<br>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col s12 m4">
+            <select onchange="crea_qualificacio(this, {{ equip.id }})">
+              <option value="">--- afegeix qualificació ---</option>
+              {% for sprint in projecte.sprints.all %}
+                <option value="{{ sprint.id }}">{{ sprint.nom }}</option>
+              {% endfor %}
+            </select>
+            <label>Afegir qualificació</label>
+          </div>
+        </div>
+
+        <div class="row">
+          {% for quali in equip.qualificacions.all %}
+            <div class="col s12 m6 l4">
+              <div class="card blue-grey darken-1">
+                <div class="card-content white-text">
+                  <span class="card-title">{{ quali.sprint.nom }}</span>
+                  <p>{{ quali.specs_completades_mps_ponderat }}</p>
+                </div>
+                <div class="card-action">
+                  <a href="#modal1" class="modal-trigger" onclick="edita_qualificacio({{ quali.id }})">Editar</a>
+                  <a href="#" onclick="elimina_qualificacio({{ quali.id }}); return false;">Eliminar</a>
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="grey-text">Encara no hi ha cap qualificació per aquest equip.</p>
+          {% endfor %}
+        </div>
+      {% empty %}
+        <div class="card-panel">Aquest projecte encara no té equips.</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<div style="display:none;">{% csrf_token %}</div>
+
+<div id="modal1" class="modal modal-fixed-footer">
+  <div class="modal-content">
+    <h4 id="modal-equip">Equip</h4>
+    <div id="modal-membres" class="grey-text"></div>
+    <ul class="collection" id="modal-specs"></ul>
+    <div class="input-field">
+      <textarea id="comentaris" class="materialize-textarea"></textarea>
+      <label for="comentaris">Comentaris del sprint review</label>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <a href="#" onclick="guarda_comentari(); return false;" class="waves-effect waves-green btn-flat">Guarda comentari</a>
+    <a href="#!" class="modal-close waves-effect waves-green btn-flat">Tanca</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  var currentQualificacioId = null;
+
+  function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return "";
+  }
+
+  function post(url, data) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams(data || {})
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    });
+  }
+
+  function crea_qualificacio(elem, equipId) {
+    if (!elem.value) return;
+    post("/scrum/api/crea_qualificacio/" + elem.value + "/" + equipId)
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR al crear la qualificació.");
+          return;
+        }
+        location.reload();
+      })
+      .catch(function () {
+        alert("ERROR en la creació de la qualificació de l'equip.");
+      });
+  }
+
+  function elimina_qualificacio(qualiId) {
+    if (!confirm("Segur que vols eliminar aquesta qualificació? L'operació no es pot desfer.")) {
+      return;
+    }
+    post("/scrum/api/elimina_qualificacio/" + qualiId)
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR intern a l'eliminar la qualificació.");
+          return;
+        }
+        location.reload();
+      })
+      .catch(function () {
+        alert("ERROR a l'eliminar la qualificació.");
+      });
+  }
+
+  function edita_qualificacio(qualiId) {
+    fetch("/scrum/api/get_qualificacio/" + qualiId)
+      .then(function (response) { return response.json(); })
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR accedint a la qualificació.");
+          return;
+        }
+        currentQualificacioId = qualiId;
+        var quali = resp.qualificacio;
+        var equip = quali.equip;
+
+        document.getElementById("modal-equip").textContent = equip.nom;
+        document.getElementById("modal-membres").innerHTML =
+          equip.membres.map(function (m) {
+            return m.first_name + " " + m.last_name + " (" + m.email + ")";
+          }).join("<br>");
+
+        var list = document.getElementById("modal-specs");
+        list.innerHTML = "";
+        quali.done_specs.forEach(function (ds) {
+          var mps = ds.spec.mp.map(function (mp) {
+            return mp.nom.substring(0, 4);
+          }).join(" ");
+
+          var li = document.createElement("li");
+          li.className = "collection-item";
+          li.innerHTML =
+            '<label>' +
+              '<input type="checkbox" class="filled-in" ' + (ds.done ? "checked" : "") +
+              ' onchange="toggle_done_spec(' + ds.id + ')" />' +
+              '<span>' + ds.spec.ordre + '. ' + ds.spec.nom +
+              ' <span class="teal-text">[' + ds.spec.hores_estimades + ' h] ' + mps + '</span></span>' +
+            '</label>';
+          list.appendChild(li);
+        });
+
+        document.getElementById("comentaris").value = quali.comentaris || "";
+        M.textareaAutoResize(document.getElementById("comentaris"));
+
+        var modal = M.Modal.getInstance(document.getElementById("modal1"));
+        modal.open();
+      })
+      .catch(function () {
+        alert("ERROR accedint a la qualificació de l'equip.");
+      });
+  }
+
+  function toggle_done_spec(doneSpecId) {
+    post("/scrum/api/toggle_done_spec/" + doneSpecId)
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR al modificar l'estat de la spec.");
+        }
+      })
+      .catch(function () {
+        alert("ERROR en l'actualització de la spec.");
+      });
+  }
+
+  function guarda_comentari() {
+    if (!currentQualificacioId) return;
+    post("/scrum/api/set_comment_to_qualificacio/" + currentQualificacioId, {
+      comentaris: document.getElementById("comentaris").value
+    })
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR al guardar el comentari.");
+          return;
+        }
+        M.toast({ html: "Comentari guardat." });
+      })
+      .catch(function () {
+        alert("ERROR al guardar el comentari.");
+      });
+  }
+
+  function toggle_members() {
+    $(".membersbox").toggleClass("hide");
+  }
+</script>
+{% endblock %}

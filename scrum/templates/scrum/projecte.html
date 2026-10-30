@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load scrum_extras %}
+
+{% block title %}{{ projecte.nom }} · Scrum Master{% endblock %}
+
+{% block extra_css %}
+.collection-header { background-color: #b3e5fc !important; }
+.comment-box { border-bottom: 1px solid #cfd8dc; }
+.comment-form, .comment-container { display: none; }
+.anchor { color: #000; }
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <div>
+      <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
+    </div>
+
+    <div class="row">
+      <div class="col s12 m8">
+        <div class="card-panel light-blue lighten-4">
+          <h3>{{ projecte.nom }}</h3>
+          <p>Centre: <b>{{ projecte.centre }}</b></p>
+          <p>Cicle: <b>{{ projecte.cicle|default:"—" }}</b></p>
+          <p>Inici: {{ projecte.inici }}</p>
+          <p>Final: {{ projecte.final }}</p>
+        </div>
+      </div>
+      <div class="col s12 m4">
+        <div class="card-panel light-blue lighten-4">
+          <h5>Continguts</h5>
+          <ul class="collection">
+            <a class="collection-item" href="#moduls-professionals">Mòduls professionals</a>
+            <a class="collection-item" href="#descripcio">Descripció</a>
+            {% for sprint in projecte.sprints.all %}
+              <a class="collection-item" href="#sprint-{{ sprint.id }}">{{ sprint.nom }}</a>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-panel light-blue lighten-4">
+      <h4><a class="anchor" id="moduls-professionals">Mòduls professionals implicats</a></h4>
+      {% for mp in mps %}
+        {{ mp.nom }}<br>
+      {% empty %}
+        <span class="grey-text">Encara no s'ha assignat cap mòdul a les specs.</span>
+      {% endfor %}
+    </div>
+
+    <div class="card-panel light-blue lighten-4">
+      <h4><a class="anchor" id="descripcio">Descripció</a></h4>
+      {{ projecte.descripcio|safe }}
+    </div>
+
+    {% for sprint in projecte.sprints.all %}
+      <ul class="collection with-header">
+        <li class="collection-header">
+          <h4><a class="anchor" id="sprint-{{ sprint.id }}">{{ sprint.nom }}</a></h4>
+          <p>Inici: {{ sprint.inici }}</p>
+          <p>Final: {{ sprint.final }}</p>
+          <p>Hores estimades totals: {{ sprint.hores|floatformat }}</p>
+          <ul>
+            {% for mp, dades_mp in sprint.dades_mps.items %}
+              <li>
+                {{ mp }}: {{ dades_mp.specs }} specs
+                ({{ dades_mp.percent_specs|floatformat }}%),
+                {{ dades_mp.hores|floatformat }} hores
+                ({{ dades_mp.percent_hores|floatformat }}%)
+              </li>
+            {% endfor %}
+          </ul>
+        </li>
+
+        {% for spec in sprint.specs.all %}
+          <li class="collection-item">
+            <h6 style="font-weight: bold;">
+              <a class="anchor" id="sprint-{{ sprint.id }}-spec-{{ spec.id }}">
+                {{ spec.ordre }}. {{ spec.nom }}
+              </a>
+            </h6>
+            <div>{{ spec.descripcio|safe }}</div>
+            <div>
+              <p>
+                <span>Hores estimades: {{ spec.hores_estimades }}</span>
+                <span style="margin-left: 1.5rem;">Mòduls:
+                  {% for mp in spec.mp.all %}{{ mp.nom|slice:"0:4" }} {% endfor %}
+                </span>
+              </p>
+            </div>
+
+            {% if activa_comentaris %}
+              <div class="comments">
+                {% if spec.feedbacks|compte_dels_grups_de:request.user > 0 %}
+                  <p style="cursor:pointer;" onclick="toggle_read_comment({{ sprint.id }},{{ spec.id }})">
+                    <i class="material-icons left">comment</i>Llegir comentaris
+                  </p>
+                  <div class="comment-container" id="comment-container-{{ sprint.id }}-{{ spec.id }}">
+                    {% for coment in spec.feedbacks|dels_grups_de:request.user %}
+                      <div class="comment-box row">
+                        <div class="row">
+                          <div class="col s4">
+                            <i class="material-icons tiny">alarm</i>
+                            {{ coment.hores }} hores reals
+                          </div>
+                          <div class="col s4">
+                            <i class="material-icons tiny">person</i>
+                            {{ coment.usuari }}
+                          </div>
+                          <div class="col s4">
+                            <i class="material-icons tiny">people</i>
+                            {{ coment.equip|default:"—" }}
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="col s12">
+                            <i class="material-icons tiny">comment_bank</i>
+                            <div>{{ coment.desc|safe }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+
+                {% if not request.user.es_profe and not request.user.is_superuser %}
+                  <p style="cursor:pointer;" onclick="toggle_add_comment({{ sprint.id }},{{ spec.id }})">
+                    <i class="material-icons left">read_more</i>Afegir comentari
+                  </p>
+                  <div class="comment-form row" id="comment-form-{{ sprint.id }}-{{ spec.id }}">
+                    <form method="post" action="{% url 'projecte' projecte.id %}#sprint-{{ sprint.id }}-spec-{{ spec.id }}">
+                      {% csrf_token %}
+                      <input type="hidden" name="sprint_id" value="{{ sprint.id }}">
+                      <input type="hidden" name="spec_id" value="{{ spec.id }}">
+                      <div class="input-field col s6 m3">
+                        <input type="number" step="0.5" name="hores" id="hores-{{ sprint.id }}-{{ spec.id }}" required>
+                        <label for="hores-{{ sprint.id }}-{{ spec.id }}">Hores reals</label>
+                      </div>
+                      <div class="input-field col s12 m9">
+                        <textarea name="desc" id="desc-{{ sprint.id }}-{{ spec.id }}" class="materialize-textarea" required></textarea>
+                        <label for="desc-{{ sprint.id }}-{{ spec.id }}">Comentari</label>
+                      </div>
+                      <button class="btn waves-effect waves-light" type="submit">Envia comentari</button>
+                    </form>
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% empty %}
+      <div class="card-panel">
+        Aquest projecte encara no té cap sprint definit.
+      </div>
+    {% endfor %}
+
+    <div>
+      <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function toggle_add_comment(sprintId, specId) {
+    var elem = $("#comment-form-" + sprintId + "-" + specId);
+    if (elem.css("display") === "none") {
+      $(".comment-form").css("display", "none");
+      elem.css("display", "block");
+    } else {
+      elem.css("display", "none");
+    }
+  }
+
+  function toggle_read_comment(sprintId, specId) {
+    var elem = $("#comment-container-" + sprintId + "-" + specId);
+    if (elem.css("display") === "none") {
+      $(".comment-container").css("display", "none");
+      elem.css("display", "block");
+    } else {
+      elem.css("display", "none");
+    }
+  }
+
+  {% if toggled_comment %}
+    window.addEventListener("load", function () {
+      toggle_read_comment({{ toggled_comment.sprint_id }}, {{ toggled_comment.spec_id }});
+    });
+  {% endif %}
+</script>
+{% endblock %}

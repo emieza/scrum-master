@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Projectes Scrum · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Projectes Scrum</h2>
+    <p class="grey-text">Projectes ABP gestionats amb metodologia Scrum educatiu.</p>
+
+    <table class="striped responsive-table">
+      <thead>
+        <tr>
+          <th>Nom projecte</th>
+          <th>Cicle i centre</th>
+          <th>Dates inici - final</th>
+          <th>Go!</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for projecte in projectes %}
+          <tr>
+            <td>
+              <a class="title" href="{% url 'projecte' projecte.id %}">{{ projecte.nom }}</a>
+            </td>
+            <td>
+              {{ projecte.cicle|default:"—" }}<br>
+              <span class="grey-text">{{ projecte.centre }}</span>
+            </td>
+            <td>
+              <span class="grey-text">
+                Inici: {{ projecte.inici|date:"j \d\e F \d\e Y" }}<br>
+                Final: {{ projecte.final|date:"j \d\e F \d\e Y" }}
+              </span>
+            </td>
+            <td>
+              <a class="secondary-content" href="{% url 'projecte' projecte.id %}">
+                <i class="material-icons">send</i>
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">Encara no hi ha projectes. Crea'n un des de l'administració.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

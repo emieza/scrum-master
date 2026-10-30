@@ -1,0 +1,21 @@
+body {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+.collection-header h4 {
+  margin: 0.5rem 0;
+}
+
+.card .card-content .card-title {
+  font-size: 1.3rem;
+}
+
+table.striped > tbody > tr > td {
+  padding: 12px 8px;
+}
