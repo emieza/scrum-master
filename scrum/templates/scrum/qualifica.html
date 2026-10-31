@@ -30,7 +30,7 @@
         <span>Mostrar / amagar membres</span>
       </label>
       <a class="waves-effect waves-light right light-blue btn" href="{% url 'descarrega_qualificacions' projecte.id %}">
-        <i class="material-icons left">file_download</i>Descarrega CSV
+        <i class="material-icons left">file_download</i>Descarrega ODS
       </a>
 
       <div class="clearfix"></div>
@@ -62,7 +62,30 @@
               <div class="card blue-grey darken-1">
                 <div class="card-content white-text">
                   <span class="card-title">{{ quali.sprint.nom }}</span>
-                  <p>{{ quali.specs_completades_mps_ponderat }}</p>
+                  <table class="striped">
+                    <thead>
+                      <tr>
+                        <th>Mòdul professional</th>
+                        <th>Hores planificades</th>
+                        <th>Hores completades</th>
+                        <th>Percentatge</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for dada in quali.percentatges_mps %}
+                        <tr>
+                          <td>{{ dada.obj }}</td>
+                          <td>{{ dada.total }}</td>
+                          <td>{{ dada.done }}</td>
+                          <td>{{ dada.percentatge_text }}%</td>
+                        </tr>
+                      {% empty %}
+                        <tr>
+                          <td colspan="4">-</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
                 <div class="card-action">
                   <a href="#modal1" class="modal-trigger" onclick="edita_qualificacio({{ quali.id }})">Editar</a>

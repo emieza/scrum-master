@@ -335,60 +335,86 @@ class Qualificacio(models.Model):
             return "-"
         return "{} ({:.1f}%)".format(done, round(100 * done / total, 1))
 
-    def specs_completades_mps(self):
+    def _dades_mps_sprint(self):
+        """Agrupa les specs del sprint per mòdul professional.
+
+        Es tenen en compte totes les specs del sprint, encara que la
+        qualificació no tingui encara un DoneSpec per a elles (per exemple,
+        si la spec s'ha afegit després de crear la qualificació).
+        """
+        done_by_spec = {
+            dspec.spec_id: dspec.done for dspec in self.done_specs.all()
+        }
         mps = {}
-        for dspec in self.done_specs.all():
-            for mp in dspec.spec.mp.all():
+        for spec in self.sprint.specs.all():
+            hores = spec.hores_estimades or 0
+            for mp in spec.mp.all():
                 if mp.id not in mps:
-                    mps[mp.id] = {"obj": mp, "total": 0, "done": 0}
-                mps[mp.id]["total"] += 1
-                if dspec.done:
-                    mps[mp.id]["done"] += 1
+                    mps[mp.id] = {
+                        "obj": mp,
+                        "total": 0,
+                        "done": 0,
+                        "specs_total": 0,
+                        "specs_done": 0,
+                    }
+                mps[mp.id]["total"] += hores
+                mps[mp.id]["specs_total"] += 1
+                if done_by_spec.get(spec.id):
+                    mps[mp.id]["done"] += hores
+                    mps[mp.id]["specs_done"] += 1
+        return mps
+
+    def percentatges_mps(self):
+        """Retorna el percentatge completat de cada mòdul del sprint.
+
+        El percentatge es pondera per les hores estimades de les specs.
+        S'inclouen tots els mòduls amb specs al sprint, fins i tot els que
+        encara no tenen cap spec completada.
+        """
+        resultat = []
+        for dades in self._dades_mps_sprint().values():
+            percentatge = (
+                100 * dades["done"] / dades["total"] if dades["total"] else 0
+            )
+            resultat.append(
+                {
+                    "obj": dades["obj"],
+                    "mp": dades["obj"],
+                    "nom": dades["obj"].nom,
+                    "total": dades["total"],
+                    "done": dades["done"],
+                    "specs_total": dades["specs_total"],
+                    "specs_done": dades["specs_done"],
+                    "percentatge": round(percentatge, 1),
+                    "percentatge_text": "{:.1f}".format(percentatge),
+                }
+            )
+        return sorted(resultat, key=lambda d: (d["obj"].numero, d["obj"].nom))
+
+    def specs_completades_mps(self):
         ret = ""
-        for dades in mps.values():
-            mp = dades["obj"]
-            if dades["total"]:
+        for dades in self.percentatges_mps():
+            if dades["specs_total"]:
                 ret += "{} : {}/{} ({:.1f}%)<br>".format(
-                    mp.nom[:4],
-                    dades["done"],
-                    dades["total"],
-                    round(100 * dades["done"] / dades["total"], 1),
+                    dades["nom"],
+                    dades["specs_done"],
+                    dades["specs_total"],
+                    round(
+                        100 * dades["specs_done"] / dades["specs_total"], 1
+                    ),
                 )
         return mark_safe(ret)
 
     def specs_completades_mps_ponderat(self):
-        mps = {}
-        for dspec in self.done_specs.all():
-            for mp in dspec.spec.mp.all():
-                if mp.id not in mps:
-                    mps[mp.id] = {"obj": mp, "total": 0, "done": 0}
-                mps[mp.id]["total"] += dspec.spec.hores_estimades or 0
-                if dspec.done:
-                    mps[mp.id]["done"] += dspec.spec.hores_estimades or 0
         ret = ""
-        for dades in mps.values():
-            mp = dades["obj"]
-            if dades["total"] == 0:
-                ret += "{} : -<br>".format(mp.nom[:4])
-            else:
-                ret += "{} : {}/{} ({:.1f}%)<br>".format(
-                    mp.nom[:4],
-                    dades["done"],
-                    dades["total"],
-                    round(100 * dades["done"] / dades["total"], 1),
-                )
+        for dades in self.percentatges_mps():
+            ret += "{} : {:.1f}%<br>".format(
+                dades["nom"], dades["percentatge"]
+            )
         return mark_safe(ret)
 
     def hores_completades_per_mps(self):
-        mps = {}
-        for dspec in self.done_specs.all():
-            for mp in dspec.spec.mp.all():
-                if mp.id not in mps:
-                    mps[mp.id] = {"obj": mp, "total": 0, "done": 0}
-                mps[mp.id]["total"] += dspec.spec.hores_estimades or 0
-                if dspec.done:
-                    mps[mp.id]["done"] += dspec.spec.hores_estimades or 0
-        return mps
+        return self._dades_mps_sprint()
 
 
 class DoneSpec(models.Model):

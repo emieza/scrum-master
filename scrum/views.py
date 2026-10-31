@@ -1,4 +1,5 @@
-import csv
+import io
+import re
 
 from django.contrib import messages
 from django.contrib.admin.views.autocomplete import AutocompleteJsonView
@@ -7,6 +8,10 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
+from odf.opendocument import OpenDocumentSpreadsheet
+from odf.style import Style, TableCellProperties, TextProperties
+from odf.table import Table, TableCell, TableRow
+from odf.text import P
 
 from .models import (
     DoneSpec,
@@ -134,6 +139,83 @@ def qualifica(request):
     )
 
 
+def _percentatge(total, done):
+    return 100 * done / total if total else 0
+
+
+def _nom_worksheet(mp, usats):
+    """Retorna un nom de taula vàlid i únic per a l'ODS."""
+    nom = re.sub(r"[\[\]:*?/\\]", "-", mp.nom).strip("'") or "MP {}".format(
+        mp.numero
+    )
+    nom = nom[:31]
+    base = nom
+    numero = 2
+    while nom.lower() in usats:
+        sufix = " ({})".format(numero)
+        nom = base[: 31 - len(sufix)] + sufix
+        numero += 1
+    usats.add(nom.lower())
+    return nom
+
+
+def _dades_qualificacions(projecte):
+    """Prepara les dades de cada mòdul per a l'exportació a full de càlcul."""
+    sprints = list(projecte.sprints.all())
+    mps = list(projecte.mps())
+    dades = {mp.id: [] for mp in mps}
+
+    for equip in projecte.equips.prefetch_related("membres", "qualificacions"):
+        qualificacions = {
+            quali.sprint_id: quali for quali in equip.qualificacions.all()
+        }
+        dades_per_sprint = {
+            sprint_id: {
+                dada["obj"].id: dada for dada in quali.percentatges_mps()
+            }
+            for sprint_id, quali in qualificacions.items()
+        }
+        for alumne in equip.membres.all():
+            for mp in mps:
+                parcials = {}
+                total = 0
+                done = 0
+                for sprint in sprints:
+                    dada = dades_per_sprint.get(sprint.id, {}).get(mp.id)
+                    if dada:
+                        parcials[sprint.id] = {
+                            "total": dada["total"],
+                            "done": dada["done"],
+                            "percentatge": dada["percentatge_text"],
+                        }
+                        total += dada["total"]
+                        done += dada["done"]
+                    else:
+                        parcials[sprint.id] = None
+                dades[mp.id].append(
+                    {
+                        "alumne": alumne,
+                        "equip": equip,
+                        "parcials": parcials,
+                        "total": total,
+                        "done": done,
+                    }
+                )
+    return sprints, mps, dades
+
+
+def _text_ods(text, style=None):
+    cell = TableCell(valuetype="string")
+    if style is not None:
+        cell.setAttribute("stylename", style)
+    cell.addElement(P(text=str(text)))
+    return cell
+
+
+def _number_ods(value):
+    return TableCell(valuetype="float", value=float(value))
+
+
 @login_required
 def descarrega_qualificacions(request, projecte_id):
     projecte = get_object_or_404(Projecte, pk=projecte_id)
@@ -142,55 +224,85 @@ def descarrega_qualificacions(request, projecte_id):
     ).exists():
         raise Http404
 
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = (
-        'attachment; filename="qualificacions_{}.csv"'.format(projecte.id)
-    )
-    response.write("\ufeff")
+    sprints, mps, dades = _dades_qualificacions(projecte)
 
-    writer = csv.writer(response, delimiter=";")
-    writer.writerow(
-        [
-            "Cognoms",
-            "Nom",
-            "Email",
-            "Equip",
-            "Mòdul professional",
+    document = OpenDocumentSpreadsheet()
+    header_style = Style(name="HeaderCell", family="table-cell")
+    header_style.addElement(
+        TableCellProperties(
+            backgroundcolor="#455a64",
+            border="0.02cm solid #000000",
+            padding="0.1cm",
+        )
+    )
+    header_style.addElement(
+        TextProperties(color="#ffffff", fontweight="bold")
+    )
+    document.automaticstyles.addElement(header_style)
+    usats = set()
+
+    for mp in mps:
+        table = Table(name=_nom_worksheet(mp, usats))
+        headers = ["Cognoms", "Nom", "Email", "Equip"]
+        for sprint in sprints:
+            headers += [
+                "{} - Hores planificades".format(sprint.nom),
+                "{} - Hores completades".format(sprint.nom),
+                "{} - Percentatge".format(sprint.nom),
+            ]
+        headers += [
             "Hores totals",
             "Hores completades",
-            "Percentatge",
+            "Percentatge total",
         ]
-    )
 
-    for equip in projecte.equips.prefetch_related("membres", "qualificacions"):
-        for alumne in equip.membres.all():
-            totals = {}
-            for quali in equip.qualificacions.all():
-                for mp_id, dades in quali.hores_completades_per_mps().items():
-                    if mp_id not in totals:
-                        totals[mp_id] = {
-                            "obj": dades["obj"],
-                            "total": 0,
-                            "done": 0,
-                        }
-                    totals[mp_id]["total"] += dades["total"]
-                    totals[mp_id]["done"] += dades["done"]
-            for dades in totals.values():
-                percent = (
-                    100 * dades["done"] / dades["total"] if dades["total"] else 0
+        row = TableRow()
+        for titol in headers:
+            row.addElement(_text_ods(titol, header_style))
+        table.addElement(row)
+
+        for files in dades[mp.id]:
+            alumne = files["alumne"]
+            equip = files["equip"]
+            row = TableRow()
+            row.addElement(_text_ods(alumne.last_name or ""))
+            row.addElement(_text_ods(alumne.first_name or ""))
+            row.addElement(_text_ods(alumne.email or ""))
+            row.addElement(_text_ods(equip.nom))
+            for sprint in sprints:
+                parcial = files["parcials"].get(sprint.id)
+                if parcial is None:
+                    row.addElement(TableCell())
+                    row.addElement(TableCell())
+                    row.addElement(TableCell())
+                else:
+                    row.addElement(_number_ods(parcial["total"]))
+                    row.addElement(_number_ods(parcial["done"]))
+                    row.addElement(
+                        _text_ods("{}%".format(parcial["percentatge"]))
+                    )
+            row.addElement(_number_ods(files["total"]))
+            row.addElement(_number_ods(files["done"]))
+            row.addElement(
+                _text_ods(
+                    "{:.1f}%".format(
+                        _percentatge(files["total"], files["done"])
+                    )
                 )
-                writer.writerow(
-                    [
-                        alumne.last_name,
-                        alumne.first_name,
-                        alumne.email,
-                        equip.nom,
-                        dades["obj"].nom,
-                        dades["total"],
-                        dades["done"],
-                        "{:.1f}%".format(percent),
-                    ]
-                )
+            )
+            table.addElement(row)
+
+        document.spreadsheet.addElement(table)
+
+    output = io.BytesIO()
+    document.save(output)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.oasis.opendocument.spreadsheet",
+    )
+    response["Content-Disposition"] = (
+        'attachment; filename="qualificacions_{}.ods"'.format(projecte.id)
+    )
     return response
 
 
