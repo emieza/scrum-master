@@ -528,6 +528,9 @@ def _projecte_form(request, projecte=None):
                 auto_id="projecte_%s",
             ),
             "spec_descripcio_form": SpecDescripcioForm(auto_id="spec_%s"),
+            "spec_edit_descripcio_form": SpecDescripcioForm(
+                auto_id="spec_edit_%s"
+            ),
         },
     )
 
@@ -587,32 +590,38 @@ def _valida_sprint(request):
     return nom, inici, final, errors
 
 
+def _valida_spec(request):
+    nom = request.POST.get("nom", "").strip()
+    descripcio = request.POST.get("descripcio", "").strip()
+    errors = []
+
+    if not nom:
+        errors.append("El nom de la spec és obligatori.")
+
+    try:
+        ordre = int(request.POST.get("ordre", "0"))
+        if ordre < 0:
+            raise ValueError
+    except ValueError:
+        errors.append("L'ordre ha de ser un nombre enter positiu.")
+        ordre = 0
+
+    try:
+        hores = float(request.POST.get("hores_estimades", "0") or 0)
+        if hores < 0:
+            raise ValueError
+    except ValueError:
+        errors.append("Les hores estimades han de ser un nombre positiu.")
+        hores = 0
+
+    return nom, descripcio, ordre, hores, errors
+
+
 @login_required
 def crea_spec(request, projecte_id):
     projecte = get_object_or_404(Projecte, pk=projecte_id, admins=request.user)
     if request.method == "POST":
-        nom = request.POST.get("nom", "").strip()
-        descripcio = request.POST.get("descripcio", "").strip()
-        errors = []
-
-        if not nom:
-            errors.append("El nom de la spec és obligatori.")
-
-        try:
-            ordre = int(request.POST.get("ordre", "0"))
-            if ordre < 0:
-                raise ValueError
-        except ValueError:
-            errors.append("L'ordre ha de ser un nombre enter positiu.")
-            ordre = 0
-
-        try:
-            hores = float(request.POST.get("hores_estimades", "0") or 0)
-            if hores < 0:
-                raise ValueError
-        except ValueError:
-            errors.append("Les hores estimades han de ser un nombre positiu.")
-            hores = 0
+        nom, descripcio, ordre, hores, errors = _valida_spec(request)
 
         if errors:
             if _peticio_ajax(request):
@@ -657,6 +666,103 @@ def crea_spec(request, projecte_id):
 
             messages.success(request, missatge)
     return redirect("edita_projecte", id=projecte.id)
+
+
+@login_required
+@require_POST
+def actualitza_spec(request, id):
+    spec = get_object_or_404(Spec, pk=id, projecte__admins=request.user)
+    projecte = spec.projecte
+    nom, descripcio, ordre, hores, errors = _valida_spec(request)
+
+    if errors:
+        return JsonResponse({"ok": False, "errors": errors}, status=400)
+
+    spec.nom = nom
+    spec.descripcio = descripcio
+    spec.ordre = ordre
+    spec.hores_estimades = hores
+    spec.save()
+    spec.mp.set(
+        _moduls_per_projecte(projecte).filter(
+            pk__in=request.POST.getlist("mp")
+        )
+    )
+    spec.sprints.set(
+        projecte.sprints.filter(pk__in=request.POST.getlist("sprints"))
+    )
+
+    specs = projecte.specs.order_by("ordre", "id")
+    html = render_to_string(
+        "scrum/_specs_llistat.html",
+        {"specs": specs},
+        request=request,
+    )
+    ordre_nova_spec = max(
+        (spec.ordre for spec in specs), default=0
+    ) + 1
+    return JsonResponse(
+        {
+            "ok": True,
+            "missatge": "Spec «{}» actualitzada correctament.".format(nom),
+            "html": html,
+            "ordre_nova_spec": ordre_nova_spec,
+        }
+    )
+
+
+@login_required
+@require_POST
+def reordena_specs(request, projecte_id):
+    projecte = get_object_or_404(Projecte, pk=projecte_id, admins=request.user)
+    ids = request.POST.getlist("ids")
+
+    try:
+        ids = [int(spec_id) for spec_id in ids]
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"ok": False, "errors": ["L'ordre de les specs no és vàlid."]},
+            status=400,
+        )
+
+    if len(ids) != len(set(ids)):
+        return JsonResponse(
+            {"ok": False, "errors": ["L'ordre de les specs no és vàlid."]},
+            status=400,
+        )
+
+    ids_actuals = set(projecte.specs.values_list("id", flat=True))
+    if set(ids) != ids_actuals:
+        return JsonResponse(
+            {
+                "ok": False,
+                "errors": ["Cal enviar totes les specs del projecte."],
+            },
+            status=400,
+        )
+
+    specs = {spec.id: spec for spec in projecte.specs.filter(pk__in=ids)}
+    for index, spec_id in enumerate(ids, start=1):
+        specs[spec_id].ordre = index
+    if ids:
+        Spec.objects.bulk_update(
+            [specs[spec_id] for spec_id in ids], ["ordre"]
+        )
+
+    specs_ordenades = projecte.specs.order_by("ordre", "id")
+    html = render_to_string(
+        "scrum/_specs_llistat.html",
+        {"specs": specs_ordenades},
+        request=request,
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "missatge": "Ordre de les specs desat correctament.",
+            "html": html,
+            "ordre_nova_spec": len(ids) + 1,
+        }
+    )
 
 
 @login_required
@@ -823,6 +929,18 @@ def qualifica(request):
         request,
         "scrum/qualifica.html",
         {"projectes": projectes, "projecte": projecte},
+    )
+
+
+@login_required
+def qualifica_projecte(request, projecte_id):
+    projecte = get_object_or_404(
+        _projectes_disponibles(request.user), pk=projecte_id
+    )
+    return render(
+        request,
+        "scrum/qualifica.html",
+        {"projectes": [], "projecte": projecte, "projecte_fixat": True},
     )
 
 

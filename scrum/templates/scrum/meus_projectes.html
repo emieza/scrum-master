@@ -60,6 +60,10 @@
                  href="{% url 'edita_projecte' projecte.id %}">
                 <i class="material-icons">edit</i>
               </a>
+              <a class="btn-floating btn-small waves-effect teal" title="Qualifica el projecte"
+                 href="{% url 'qualifica_projecte' projecte.id %}">
+                <i class="material-icons">task_alt</i>
+              </a>
               <form method="post" action="{% url 'elimina_projecte' projecte.id %}"
                     onsubmit="return confirm('Segur que vols eliminar aquest projecte?');">
                 {% csrf_token %}

@@ -8,7 +8,9 @@
 #centre-resultats,
 #cicle-resultats,
 #spec-mp-resultats,
-#spec-sprints-resultats {
+#spec-sprints-resultats,
+#spec-edit-mp-resultats,
+#spec-edit-sprints-resultats {
   position: relative;
   z-index: 10;
   margin-top: -1rem;
@@ -152,8 +154,69 @@
         Històries o especificacions del producte d'aquest projecte.
       </p>
 
-      <div id="specs-llistat">
+      <div id="specs-missatge" class="card-panel ajax-missatge" style="display: none;"></div>
+
+      <div id="specs-llistat"{% if projecte %} data-reordena-url="{% url 'reordena_specs' projecte.id %}"{% endif %}>
         {% include "scrum/_specs_llistat.html" %}
+      </div>
+
+      <div id="spec-edicio-contenidor" hidden>
+        <form id="spec-edicio-form"
+              class="spec-edicio-form"
+              method="post"
+              action=""
+              data-ajax-form
+              data-ajax-desti="#specs-llistat"
+              data-ajax-missatge="#specs-missatge"
+              data-ajax-spec-edit>
+          {% csrf_token %}
+          <div class="row">
+            <div class="input-field col s12 m2">
+              <input type="number" name="ordre" id="spec-edit-ordre"
+                     min="0" required>
+              <label for="spec-edit-ordre" class="active">Ordre</label>
+            </div>
+            <div class="input-field col s12 m7">
+              <input type="text" name="nom" id="spec-edit-nom"
+                     maxlength="600" required>
+              <label for="spec-edit-nom" class="active">Nom de la spec</label>
+            </div>
+            <div class="input-field col s12 m3">
+              <input type="number" name="hores_estimades" id="spec-edit-hores"
+                     min="0" step="0.5" required>
+              <label for="spec-edit-hores" class="active">Hores estimades</label>
+            </div>
+          </div>
+
+          <p class="grey-text">Descripció (opcional)</p>
+          {{ spec_edit_descripcio_form.descripcio }}
+
+          <div class="row">
+            <div class="col s12 m6">
+              <div class="input-field">
+                <input type="text" id="spec-edit-mp-cerca" autocomplete="off">
+                <label for="spec-edit-mp-cerca" class="active">Mòduls professionals</label>
+              </div>
+              <ul id="spec-edit-mp-resultats" class="collection" style="display: none;"></ul>
+              <div id="spec-edit-mp-seleccionats" class="spec-chips"></div>
+            </div>
+            <div class="col s12 m6">
+              <div class="input-field">
+                <input type="text" id="spec-edit-sprints-cerca" autocomplete="off">
+                <label for="spec-edit-sprints-cerca" class="active">Sprints</label>
+              </div>
+              <ul id="spec-edit-sprints-resultats" class="collection" style="display: none;"></ul>
+              <div id="spec-edit-sprints-seleccionats" class="spec-chips"></div>
+            </div>
+          </div>
+
+          <button class="btn waves-effect waves-light" type="submit">
+            <i class="material-icons left" aria-hidden="true">save</i>Desa la spec
+          </button>
+          <button class="btn-flat waves-effect" type="button" id="spec-edicio-cancela">
+            Cancel·la
+          </button>
+        </form>
       </div>
 
       <div class="card blue-grey lighten-5">
@@ -481,6 +544,22 @@
       url: "{% url 'cerca_sprints' %}",
       projecte: "{{ projecte.id }}"
     });
+    configura({
+      input: "spec-edit-mp-cerca",
+      resultats: "spec-edit-mp-resultats",
+      seleccionats: "spec-edit-mp-seleccionats",
+      name: "mp",
+      url: "{% url 'cerca_moduls' %}",
+      projecte: "{{ projecte.id }}"
+    });
+    configura({
+      input: "spec-edit-sprints-cerca",
+      resultats: "spec-edit-sprints-resultats",
+      seleccionats: "spec-edit-sprints-seleccionats",
+      name: "sprints",
+      url: "{% url 'cerca_sprints' %}",
+      projecte: "{{ projecte.id }}"
+    });
     {% endif %}
   })();
   (function () {
@@ -525,6 +604,44 @@
       element.appendChild(llista);
       element.style.display = "block";
       element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function mostraMissatgeSpec(form, text) {
+      var contenidor = document.getElementById("specs-llistat");
+      var specId = form.getAttribute("data-spec-id");
+      if (!contenidor || !specId) {
+        return false;
+      }
+
+      var fila = null;
+      contenidor.querySelectorAll("tr[data-spec-id]").forEach(function (candidata) {
+        if (candidata.getAttribute("data-spec-id") === specId) {
+          fila = candidata;
+        }
+      });
+      if (!fila) {
+        return false;
+      }
+
+      contenidor.querySelectorAll(".spec-notificacio-fila").forEach(function (notificacio) {
+        notificacio.remove();
+      });
+
+      var filaMissatge = document.createElement("tr");
+      filaMissatge.className = "spec-notificacio-fila";
+      var cella = document.createElement("td");
+      cella.colSpan = 6;
+      var missatge = document.createElement("div");
+      missatge.className = "card-panel green lighten-4 spec-notificacio";
+      missatge.setAttribute("role", "status");
+      missatge.textContent = text;
+      cella.appendChild(missatge);
+      filaMissatge.appendChild(cella);
+      fila.parentNode.insertBefore(filaMissatge, fila);
+
+      netejaMissatges();
+      missatge.scrollIntoView({ behavior: "smooth", block: "center" });
+      return true;
     }
 
     function netejaFormulariSpec(form, data) {
@@ -603,8 +720,16 @@
           if (desti && data.html) {
             var contenidor = document.querySelector(desti);
             if (contenidor) {
+              document.dispatchEvent(
+                new CustomEvent("spec-abans-reemplacar-llistat")
+              );
               contenidor.innerHTML = data.html;
             }
+          }
+
+          var campOrdre = document.getElementById("spec-nou-ordre");
+          if (campOrdre && data.ordre_nova_spec) {
+            campOrdre.value = data.ordre_nova_spec;
           }
 
           if (form.hasAttribute("data-ajax-spec")) {
@@ -613,7 +738,11 @@
             form.reset();
           }
 
-          mostraMissatge(obteMissatge(form), data.missatge || "Canvis desats.");
+          var missatge = data.missatge || "Canvis desats.";
+          if (!form.hasAttribute("data-ajax-spec-edit") ||
+              !mostraMissatgeSpec(form, missatge)) {
+            mostraMissatge(obteMissatge(form), missatge);
+          }
         })
         .catch(function () {
           mostraErrors(
@@ -627,6 +756,413 @@
           }
         });
     });
+  })();
+  (function () {
+    var contenidor = document.getElementById("specs-llistat");
+    if (!contenidor) {
+      return;
+    }
+
+    var url = contenidor.getAttribute("data-reordena-url");
+    if (!url) {
+      return;
+    }
+
+    var arrossegada = null;
+    var htmlInicial = "";
+    var desant = false;
+
+    function filesSpec() {
+      return Array.prototype.slice.call(
+        contenidor.querySelectorAll("tr[data-spec-id]")
+      );
+    }
+
+    function grup(fila) {
+      var nodes = [fila];
+      var seguent = fila.nextElementSibling;
+      if (seguent && seguent.hasAttribute("data-spec-descripcio")) {
+        nodes.push(seguent);
+      }
+      return { id: fila.getAttribute("data-spec-id"), nodes: nodes };
+    }
+
+    function grups() {
+      return filesSpec().map(grup);
+    }
+
+    function filaSpecPer(element) {
+      var fila = element.closest("tr[data-spec-id]");
+      if (fila) {
+        return fila;
+      }
+      var descripcio = element.closest("tr[data-spec-descripcio]");
+      if (descripcio) {
+        return descripcio.previousElementSibling;
+      }
+      return null;
+    }
+
+    function netejaIndicadors() {
+      contenidor
+        .querySelectorAll(".spec-drop-abans, .spec-drop-apres")
+        .forEach(function (fila) {
+          fila.classList.remove("spec-drop-abans", "spec-drop-apres");
+        });
+    }
+
+    function actualitzaZebra() {
+      filesSpec().forEach(function (fila, index) {
+        var classe =
+          (index + 1) % 2 === 0 ? "spec-fila-parell" : "spec-fila-senar";
+        fila.classList.remove("spec-fila-senar", "spec-fila-parell");
+        fila.classList.add(classe);
+
+        var descripcio = fila.nextElementSibling;
+        if (descripcio && descripcio.hasAttribute("data-spec-descripcio")) {
+          descripcio.classList.remove("spec-fila-senar", "spec-fila-parell");
+          descripcio.classList.add(classe);
+        }
+      });
+    }
+
+    function mostraMissatge(text, error) {
+      var missatge = document.getElementById("specs-missatge");
+      if (!missatge) {
+        return;
+      }
+      document.querySelectorAll(".ajax-missatge").forEach(function (element) {
+        element.style.display = "none";
+      });
+      missatge.innerHTML = "";
+      missatge.className =
+        "card-panel ajax-missatge " +
+        (error ? "red lighten-4" : "green lighten-4");
+      missatge.textContent = text;
+      missatge.style.display = "block";
+    }
+
+    function desaOrdre() {
+      if (desant) {
+        return;
+      }
+      desant = true;
+      var ids = filesSpec().map(function (fila) {
+        return fila.getAttribute("data-spec-id");
+      });
+      var dades = new FormData();
+      ids.forEach(function (id) {
+        dades.append("ids", id);
+      });
+
+      var csrf = document.querySelector("[name=csrfmiddlewaretoken]");
+      fetch(url, {
+        method: "POST",
+        body: dades,
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": csrf ? csrf.value : ""
+        },
+        credentials: "same-origin"
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data };
+          });
+        })
+        .then(function (resultat) {
+          var data = resultat.data;
+          if (!resultat.ok || !data.ok) {
+            contenidor.innerHTML = htmlInicial;
+            mostraMissatge(
+              (data.errors || ["No s'ha pogut desar l'ordre."]).join(" "),
+              true
+            );
+            return;
+          }
+
+          if (data.html) {
+            document.dispatchEvent(
+              new CustomEvent("spec-abans-reemplacar-llistat")
+            );
+            contenidor.innerHTML = data.html;
+          }
+
+          var campOrdre = document.getElementById("spec-nou-ordre");
+          if (campOrdre && data.ordre_nova_spec) {
+            campOrdre.value = data.ordre_nova_spec;
+          }
+
+          mostraMissatge(
+            data.missatge || "Ordre de les specs desat correctament.",
+            false
+          );
+        })
+        .catch(function () {
+          contenidor.innerHTML = htmlInicial;
+          mostraMissatge(
+            "No s'ha pogut desar l'ordre. Torna-ho a provar.",
+            true
+          );
+        })
+        .finally(function () {
+          desant = false;
+        });
+    }
+
+    contenidor.addEventListener("dragstart", function (event) {
+      var fila = event.target.closest("tr[data-spec-id]");
+      if (!fila || desant) {
+        event.preventDefault();
+        return;
+      }
+      document.dispatchEvent(new CustomEvent("spec-tanca-editor"));
+      arrossegada = fila;
+      htmlInicial = contenidor.innerHTML;
+      fila.classList.add("spec-arrossegada");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", fila.getAttribute("data-spec-id"));
+    });
+
+    contenidor.addEventListener("dragover", function (event) {
+      var fila = filaSpecPer(event.target);
+      if (!fila || !arrossegada || fila === arrossegada || desant) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      netejaIndicadors();
+      var rectangle = fila.getBoundingClientRect();
+      if (event.clientY < rectangle.top + rectangle.height / 2) {
+        fila.classList.add("spec-drop-abans");
+      } else {
+        fila.classList.add("spec-drop-apres");
+      }
+    });
+
+    contenidor.addEventListener("dragleave", function (event) {
+      if (!contenidor.contains(event.relatedTarget)) {
+        netejaIndicadors();
+      }
+    });
+
+    contenidor.addEventListener("drop", function (event) {
+      var desti = filaSpecPer(event.target);
+      if (!desti || !arrossegada || desti === arrossegada || desant) {
+        netejaIndicadors();
+        return;
+      }
+      event.preventDefault();
+
+      var inserirAbans = desti.classList.contains("spec-drop-abans");
+      var tots = grups();
+      var idArrossegat = arrossegada.getAttribute("data-spec-id");
+      var idDesti = desti.getAttribute("data-spec-id");
+      var origen = tots.findIndex(function (item) {
+        return item.id === idArrossegat;
+      });
+      var destiIndex = tots.findIndex(function (item) {
+        return item.id === idDesti;
+      });
+
+      netejaIndicadors();
+      if (origen === -1 || destiIndex === -1 || origen === destiIndex) {
+        return;
+      }
+
+      var mogut = tots.splice(origen, 1)[0];
+      var posicio = destiIndex + (inserirAbans ? 0 : 1);
+      if (origen < destiIndex) {
+        posicio -= 1;
+      }
+      tots.splice(posicio, 0, mogut);
+
+      var tbody = contenidor.querySelector("tbody");
+      if (!tbody) {
+        return;
+      }
+      tots.forEach(function (item) {
+        item.nodes.forEach(function (node) {
+          tbody.appendChild(node);
+        });
+      });
+      actualitzaZebra();
+      desaOrdre();
+    });
+
+    contenidor.addEventListener("dragend", function () {
+      if (arrossegada) {
+        arrossegada.classList.remove("spec-arrossegada");
+      }
+      arrossegada = null;
+      netejaIndicadors();
+    });
+  })();
+  (function () {
+    var contenidor = document.getElementById("specs-llistat");
+    var parc = document.getElementById("spec-edicio-contenidor");
+    var formulari = document.getElementById("spec-edicio-form");
+    if (!contenidor || !parc || !formulari) {
+      return;
+    }
+
+    var filaActual = null;
+    var filaEdicio = null;
+
+    function editorDescripcio() {
+      return window.editors && window.editors["spec_edit_descripcio"];
+    }
+
+    function actualitzaEditor(html) {
+      var editor = editorDescripcio();
+      if (!editor) {
+        return;
+      }
+      editor.setData(html || "");
+    }
+
+    function creaChip(desti, id, nom, name) {
+      var chip = document.createElement("span");
+      chip.className = "spec-chip";
+      chip.appendChild(document.createTextNode(nom));
+
+      var boto = document.createElement("button");
+      boto.type = "button";
+      boto.className = "spec-chip-remove";
+      boto.textContent = "×";
+      boto.setAttribute("aria-label", "Treure " + nom);
+      boto.addEventListener("click", function () {
+        chip.remove();
+      });
+      chip.appendChild(boto);
+
+      var hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = name;
+      hidden.value = id;
+      chip.appendChild(hidden);
+
+      desti.appendChild(chip);
+    }
+
+    function ompleChips(fila, tipus, desti, name) {
+      desti.innerHTML = "";
+      fila.querySelectorAll("[data-" + tipus + "-id]").forEach(function (dada) {
+        creaChip(
+          desti,
+          dada.getAttribute("data-" + tipus + "-id"),
+          dada.getAttribute("data-nom"),
+          name
+        );
+      });
+    }
+
+    function netejaCerques() {
+      [
+        ["spec-edit-mp-cerca", "spec-edit-mp-resultats"],
+        ["spec-edit-sprints-cerca", "spec-edit-sprints-resultats"]
+      ].forEach(function (ids) {
+        var camp = document.getElementById(ids[0]);
+        var resultats = document.getElementById(ids[1]);
+        if (camp) {
+          camp.value = "";
+        }
+        if (resultats) {
+          resultats.innerHTML = "";
+          resultats.style.display = "none";
+        }
+      });
+    }
+
+    function tanca() {
+      if (!filaActual) {
+        return;
+      }
+      if (filaEdicio && filaEdicio.parentNode) {
+        filaEdicio.remove();
+      }
+      parc.appendChild(formulari);
+      filaActual = null;
+      filaEdicio = null;
+    }
+
+    function obre(fila) {
+      if (filaActual === fila) {
+        tanca();
+        return;
+      }
+      tanca();
+      filaActual = fila;
+
+      filaEdicio = document.createElement("tr");
+      filaEdicio.className = "spec-edicio-fila";
+      var td = document.createElement("td");
+      td.colSpan = 6;
+      td.appendChild(formulari);
+      filaEdicio.appendChild(td);
+
+      var seguent = fila.nextElementSibling;
+      if (seguent && seguent.hasAttribute("data-spec-descripcio")) {
+        seguent = seguent.nextElementSibling;
+      }
+      if (seguent) {
+        seguent.parentNode.insertBefore(filaEdicio, seguent);
+      } else {
+        fila.parentNode.appendChild(filaEdicio);
+      }
+
+      formulari.setAttribute("data-spec-id", fila.getAttribute("data-spec-id"));
+      contenidor.querySelectorAll(".spec-notificacio-fila").forEach(function (notificacio) {
+        notificacio.remove();
+      });
+
+      document.getElementById("spec-edit-nom").value =
+        fila.getAttribute("data-spec-nom") || "";
+      document.getElementById("spec-edit-ordre").value =
+        fila.getAttribute("data-spec-ordre") || "0";
+      document.getElementById("spec-edit-hores").value =
+        fila.getAttribute("data-spec-hores") || "0";
+      formulari.action = fila.getAttribute("data-actualitza-url");
+
+      actualitzaEditor(fila.getAttribute("data-spec-descripcio-html") || "");
+      ompleChips(
+        fila,
+        "mp",
+        document.getElementById("spec-edit-mp-seleccionats"),
+        "mp"
+      );
+      ompleChips(
+        fila,
+        "sprint",
+        document.getElementById("spec-edit-sprints-seleccionats"),
+        "sprints"
+      );
+      netejaCerques();
+
+      filaEdicio.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("spec-edit-nom").focus({ preventScroll: true });
+    }
+
+    contenidor.addEventListener("click", function (event) {
+      var boto = event.target.closest(".spec-edita");
+      if (!boto || !contenidor.contains(boto)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      var fila = boto.closest("tr[data-spec-id]");
+      if (fila) {
+        obre(fila);
+      }
+    });
+
+    var cancela = document.getElementById("spec-edicio-cancela");
+    if (cancela) {
+      cancela.addEventListener("click", tanca);
+    }
+
+    document.addEventListener("spec-abans-reemplacar-llistat", tanca);
+    document.addEventListener("spec-tanca-editor", tanca);
   })();
 </script>
 {% endblock %}

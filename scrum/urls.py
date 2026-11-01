@@ -34,9 +34,24 @@ urlpatterns = [
         name="elimina_projecte",
     ),
     path(
+        "scrum/els-meus-projectes/<int:projecte_id>/qualifica",
+        views.qualifica_projecte,
+        name="qualifica_projecte",
+    ),
+    path(
         "scrum/els-meus-projectes/<int:projecte_id>/specs/nou",
         views.crea_spec,
         name="crea_spec",
+    ),
+    path(
+        "scrum/els-meus-projectes/<int:projecte_id>/specs/reordena",
+        views.reordena_specs,
+        name="reordena_specs",
+    ),
+    path(
+        "scrum/specs/<int:id>/actualitza",
+        views.actualitza_spec,
+        name="actualitza_spec",
     ),
     path(
         "scrum/els-meus-projectes/<int:projecte_id>/sprints/nou",

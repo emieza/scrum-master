@@ -222,6 +222,37 @@ class ScrumTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Projecte de prova")
 
+    def test_qualifica_projecte_requereix_login(self):
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_qualifica_projecte_fixat(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Qualifica: Projecte de prova")
+        self.assertContains(response, "Descarrega ODS")
+        self.assertContains(
+            response, reverse("els_meus_projectes")
+        )
+        self.assertNotContains(response, 'name="projecte_id"')
+
+    def test_qualifica_projecte_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_targetes_qualificacio_mostren_percentatges_per_mp(self):
         equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
         quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
@@ -636,6 +667,10 @@ class ScrumTests(TestCase):
         self.assertContains(
             response, reverse("elimina_projecte", args=[self.projecte.id])
         )
+        self.assertContains(
+            response, reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(response, "Qualifica el projecte")
         self.assertContains(response, "Segur que vols eliminar aquest projecte?")
 
     def test_edita_projecte_requereix_login(self):
@@ -811,7 +846,7 @@ class ScrumTests(TestCase):
         )
 
     def test_edita_projecte_mostra_la_descripcio_de_les_specs_col_lapsada(self):
-        Spec.objects.create(
+        spec = Spec.objects.create(
             nom="Spec amb descripció",
             projecte=self.projecte,
             ordre=2,
@@ -823,14 +858,220 @@ class ScrumTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="spec-descripcio"')
-        self.assertContains(response, 'colspan="4"')
+        self.assertContains(response, 'colspan="5"')
         self.assertContains(response, 'spec-fila-senar')
         self.assertContains(response, 'spec-descripcio-fila spec-fila-')
         self.assertContains(response, "Text desplegable")
+        self.assertContains(
+            response, 'data-spec-id="{}"'.format(spec.id)
+        )
+        self.assertContains(response, 'draggable="true"')
+        self.assertContains(response, 'class="spec-drag-handle"')
+        self.assertContains(
+            response, 'data-spec-descripcio="{}"'.format(spec.id)
+        )
+        self.assertContains(
+            response, reverse("reordena_specs", args=[self.projecte.id])
+        )
+        self.assertContains(response, 'id="specs-missatge"')
+        self.assertContains(response, "<th>Accions</th>")
+        self.assertContains(
+            response,
+            'data-actualitza-url="{}"'.format(
+                reverse("actualitza_spec", args=[spec.id])
+            ),
+        )
+        self.assertContains(
+            response,
+            'class="btn-small waves-effect waves-light blue spec-edita"',
+        )
+        self.assertContains(response, 'data-spec-nom="Spec amb descripció"')
+        self.assertContains(
+            response, 'data-spec-descripcio-html="&lt;p&gt;Text desplegable&lt;/p&gt;"'
+        )
+        self.assertContains(response, 'id="spec-edicio-form"')
+        self.assertContains(response, "data-ajax-spec-edit")
+        self.assertContains(response, 'id="spec-edit-nom"')
+        self.assertContains(response, 'id="spec-edit-mp-cerca"')
+        self.assertContains(response, 'id="spec-edit-sprints-cerca"')
         self.assertNotContains(response, "<th>Descripció</th>")
         self.assertNotContains(
             response, '<details class="spec-descripcio" open>'
         )
+
+    def test_reordena_specs_amb_ajax(self):
+        segona = Spec.objects.create(
+            nom="Segona spec",
+            projecte=self.projecte,
+            ordre=2,
+        )
+        tercera = Spec.objects.create(
+            nom="Tercera spec",
+            projecte=self.projecte,
+            ordre=3,
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("reordena_specs", args=[self.projecte.id]),
+            {
+                "ids": [
+                    str(tercera.id),
+                    str(self.spec.id),
+                    str(segona.id),
+                ]
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["ordre_nova_spec"], 4)
+        self.assertLess(
+            data["html"].index("Tercera spec"),
+            data["html"].index("Segona spec"),
+        )
+
+        noms = list(
+            Spec.objects.filter(projecte=self.projecte)
+            .order_by("ordre", "id")
+            .values_list("nom", flat=True)
+        )
+        self.assertEqual(noms, ["Tercera spec", "Pantalla d'inici", "Segona spec"])
+        self.assertEqual(Spec.objects.get(pk=tercera.pk).ordre, 1)
+        self.assertEqual(Spec.objects.get(pk=segona.pk).ordre, 3)
+
+    def test_reordena_specs_requereix_totes_les_specs(self):
+        Spec.objects.create(
+            nom="Segona spec",
+            projecte=self.projecte,
+            ordre=2,
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("reordena_specs", args=[self.projecte.id]),
+            {"ids": [str(self.spec.id)]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["ok"])
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.ordre, 1)
+
+    def test_reordena_specs_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("reordena_specs", args=[self.projecte.id]),
+            {"ids": [str(self.spec.id)]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.ordre, 1)
+
+    def test_actualitza_spec_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_spec", args=[self.spec.id]),
+            {
+                "nom": "Spec editada",
+                "descripcio": "<p>Descripció editada</p>",
+                "ordre": "5",
+                "hores_estimades": "3.5",
+                "mp": [str(self.mp.id)],
+                "sprints": [str(self.sprint.id)],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(
+            data["missatge"], "Spec «Spec editada» actualitzada correctament."
+        )
+        self.assertIn("Spec editada", data["html"])
+        self.assertEqual(data["ordre_nova_spec"], 6)
+
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.nom, "Spec editada")
+        self.assertEqual(self.spec.descripcio, "<p>Descripció editada</p>")
+        self.assertEqual(self.spec.ordre, 5)
+        self.assertEqual(self.spec.hores_estimades, 3.5)
+        self.assertIn(self.mp, self.spec.mp.all())
+        self.assertIn(self.sprint, self.spec.sprints.all())
+
+    def test_actualitza_spec_pot_treure_mp_i_sprints(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_spec", args=[self.spec.id]),
+            {
+                "nom": self.spec.nom,
+                "descripcio": self.spec.descripcio,
+                "ordre": str(self.spec.ordre),
+                "hores_estimades": str(self.spec.hores_estimades),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertFalse(self.spec.mp.exists())
+        self.assertFalse(self.spec.sprints.exists())
+
+    def test_actualitza_spec_valida_les_dades(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_spec", args=[self.spec.id]),
+            {"nom": "", "ordre": "-1", "hores_estimades": "-2"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertIn("El nom de la spec és obligatori.", data["errors"])
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.nom, "Pantalla d'inici")
+        self.assertEqual(self.spec.ordre, 1)
+
+    def test_actualitza_spec_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_spec", args=[self.spec.id]),
+            {
+                "nom": "Spec editada",
+                "ordre": "1",
+                "hores_estimades": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_actualitza_spec_requereix_login(self):
+        response = self.client.post(
+            reverse("actualitza_spec", args=[self.spec.id]),
+            {
+                "nom": "Spec editada",
+                "ordre": "1",
+                "hores_estimades": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_actualitza_spec_requereix_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("actualitza_spec", args=[self.spec.id])
+        )
+        self.assertEqual(response.status_code, 405)
 
     def test_crea_spec_requereix_login(self):
         response = self.client.post(

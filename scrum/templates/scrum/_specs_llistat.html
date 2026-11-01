@@ -7,12 +7,25 @@
         <th>Mòduls professionals</th>
         <th>Hores</th>
         <th>Sprints</th>
+        <th>Accions</th>
       </tr>
     </thead>
     <tbody>
       {% for spec in specs %}
-        <tr class="spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}{% if spec.descripcio %} spec-amb-descripcio{% endif %}">
-          <td>{{ spec.ordre }}</td>
+        <tr class="spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}{% if spec.descripcio %} spec-amb-descripcio{% endif %}"
+            data-spec-id="{{ spec.id }}"
+            data-actualitza-url="{% url 'actualitza_spec' spec.id %}"
+            data-spec-nom="{{ spec.nom }}"
+            data-spec-ordre="{{ spec.ordre }}"
+            data-spec-hores="{{ spec.hores_estimades|stringformat:'g' }}"
+            data-spec-descripcio-html="{{ spec.descripcio }}"
+            draggable="true">
+          <td>
+            <span class="spec-drag-handle" title="Arrossega per reordenar">
+              <i class="material-icons" aria-hidden="true">drag_indicator</i>
+            </span>
+            {{ spec.ordre }}
+          </td>
           <td>{{ spec.nom }}</td>
           <td>
             {% for mp in spec.mp.all %}
@@ -21,11 +34,28 @@
           </td>
           <td>{{ spec.hores_estimades }}</td>
           <td>{{ spec.show_sprints|default:"—" }}</td>
+          <td class="spec-accions">
+            <button type="button"
+                    class="btn-small waves-effect waves-light blue spec-edita"
+                    draggable="false"
+                    title="Edita la spec"
+                    aria-label="Edita {{ spec.nom }}">
+              <i class="material-icons left" aria-hidden="true">edit</i>Edita
+            </button>
+            <span class="spec-dades" hidden>
+              {% for mp in spec.mp.all %}
+                <span data-mp-id="{{ mp.id }}" data-nom="{{ mp }}"></span>
+              {% endfor %}
+              {% for sprint in spec.sprints.all %}
+                <span data-sprint-id="{{ sprint.id }}" data-nom="{{ sprint }}"></span>
+              {% endfor %}
+            </span>
+          </td>
         </tr>
         {% if spec.descripcio %}
-          <tr class="spec-descripcio-fila spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}">
+          <tr class="spec-descripcio-fila spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}" data-spec-descripcio="{{ spec.id }}">
             <td></td>
-            <td colspan="4">
+            <td colspan="5">
               <details class="spec-descripcio">
                 <summary>Mostra la descripció</summary>
                 <div class="rich-text">{{ spec.descripcio|safe }}</div>
