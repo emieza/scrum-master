@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block title %}{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %} · Scrum Master{% endblock %}
+
+{% block extra_head %}{{ descripcio_form.media }}{% endblock %}
+
+{% block extra_css %}
+#centre-resultats,
+#cicle-resultats,
+#spec-mp-resultats,
+#spec-sprints-resultats {
+  position: relative;
+  z-index: 10;
+  margin-top: -1rem;
+}
+.spec-chips {
+  margin: 0.25rem 0 1rem;
+}
+.spec-chip {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  margin: 0.2rem;
+  border-radius: 16px;
+  background-color: #e0e0e0;
+}
+.spec-chip button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  margin-left: 0.35rem;
+  font-weight: bold;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %}</h2>
+    {% if projecte %}<h3>{{ projecte.nom }}</h3>{% endif %}
+    <p class="grey-text">
+      {% if projecte %}
+        Modifica les dades del projecte «{{ projecte.nom }}».
+      {% else %}
+        Crea un projecte ABP. Tu seràs administrador del projecte.
+      {% endif %}
+    </p>
+
+    {% if errors %}
+      <div class="card-panel red lighten-4">
+        <ul class="browser-default">
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="input-field">
+        <input type="text" name="nom" id="nom" value="{{ dades.nom }}" maxlength="255" required>
+        <label for="nom" {% if dades.nom %}class="active"{% endif %}>Nom del projecte</label>
+      </div>
+
+      <p class="grey-text">Descripció (opcional)</p>
+      {{ descripcio_form.descripcio }}
+
+      <div class="input-field">
+        <input type="text" id="centre-cerca" autocomplete="off" value="{{ dades.centre_nom }}">
+        <input type="hidden" name="centre" id="centre" value="{{ dades.centre }}">
+        <label for="centre-cerca" class="active">Centre (opcional)</label>
+      </div>
+      <ul id="centre-resultats" class="collection" style="display: none;"></ul>
+      <p class="grey-text">
+        Cerca el centre pel nom o la població i selecciona'l de la llista.
+      </p>
+
+      <div class="input-field">
+        <input type="text" id="cicle-cerca" autocomplete="off" value="{{ dades.cicle_nom }}">
+        <input type="hidden" name="cicle" id="cicle" value="{{ dades.cicle }}">
+        <label for="cicle-cerca" class="active">Cicle (opcional)</label>
+      </div>
+      <ul id="cicle-resultats" class="collection" style="display: none;"></ul>
+      <p class="grey-text">
+        Cerca el cicle pel nom o el codi i selecciona'l de la llista.
+      </p>
+
+      <div class="row">
+        <div class="input-field col s12 m6">
+          <input type="date" name="inici" id="inici" value="{{ dades.inici }}" required>
+          <label for="inici" class="active">Data d'inici</label>
+        </div>
+        <div class="input-field col s12 m6">
+          <input type="date" name="final" id="final" value="{{ dades.final }}" required>
+          <label for="final" class="active">Data final</label>
+        </div>
+      </div>
+
+      <button class="btn waves-effect waves-light" type="submit">
+        <i class="material-icons left">save</i>{% if projecte %}Desa els canvis{% else %}Crea el projecte{% endif %}
+      </button>
+    </form>
+
+    {% if projecte %}
+      <div class="divider" style="margin: 2.5rem 0;"></div>
+
+      <h4>Sprints</h4>
+      <p class="grey-text">
+        Crea i edita les iteracions d'aquest projecte.
+      </p>
+
+      {% for sprint in sprints %}
+        <div class="card">
+          <div class="card-content">
+            <span class="card-title">{{ sprint.nom }}</span>
+            <form method="post" action="{% url 'edita_sprint' sprint.id %}">
+              {% csrf_token %}
+              <div class="row">
+                <div class="input-field col s12 m4">
+                  <input type="text" name="nom" id="sprint-nom-{{ sprint.id }}"
+                         value="{{ sprint.nom }}" maxlength="255" required>
+                  <label for="sprint-nom-{{ sprint.id }}" class="active">Nom del sprint</label>
+                </div>
+                <div class="input-field col s12 m4">
+                  <input type="date" name="inici" id="sprint-inici-{{ sprint.id }}"
+                         value="{{ sprint.inici|date:'Y-m-d' }}" required>
+                  <label for="sprint-inici-{{ sprint.id }}" class="active">Data d'inici</label>
+                </div>
+                <div class="input-field col s12 m4">
+                  <input type="date" name="final" id="sprint-final-{{ sprint.id }}"
+                         value="{{ sprint.final|date:'Y-m-d' }}" required>
+                  <label for="sprint-final-{{ sprint.id }}" class="active">Data final</label>
+                </div>
+              </div>
+              <button class="btn waves-effect waves-light" type="submit">
+                <i class="material-icons left">save</i>Desa el sprint
+              </button>
+            </form>
+          </div>
+        </div>
+      {% empty %}
+        <p>Encara no hi ha cap sprint en aquest projecte.</p>
+      {% endfor %}
+
+      <div class="card blue-grey lighten-5">
+        <div class="card-content">
+          <span class="card-title">Nou sprint</span>
+          <form method="post" action="{% url 'crea_sprint' projecte.id %}">
+            {% csrf_token %}
+            <div class="row">
+              <div class="input-field col s12 m4">
+                <input type="text" name="nom" id="sprint-nou-nom" maxlength="255" required>
+                <label for="sprint-nou-nom">Nom del sprint</label>
+              </div>
+              <div class="input-field col s12 m4">
+                <input type="date" name="inici" id="sprint-nou-inici"
+                       value="{{ sprint_inici }}" required>
+                <label for="sprint-nou-inici" class="active">Data d'inici</label>
+              </div>
+              <div class="input-field col s12 m4">
+                <input type="date" name="final" id="sprint-nou-final"
+                       value="{{ sprint_final }}" required>
+                <label for="sprint-nou-final" class="active">Data final</label>
+              </div>
+            </div>
+            <button class="btn waves-effect waves-light" type="submit">
+              <i class="material-icons left">add</i>Afegeix el sprint
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="divider" style="margin: 2.5rem 0;"></div>
+
+      <h4>Specs</h4>
+      <p class="grey-text">
+        Històries o especificacions del producte d'aquest projecte.
+      </p>
+
+      {% if specs %}
+        <table class="striped responsive-table">
+          <thead>
+            <tr>
+              <th>Ordre</th>
+              <th>Nom</th>
+              <th>Mòduls professionals</th>
+              <th>Hores</th>
+              <th>Sprints</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for spec in specs %}
+              <tr>
+                <td>{{ spec.ordre }}</td>
+                <td>{{ spec.nom }}</td>
+                <td>
+                  {% for mp in spec.mp.all %}
+                    {{ mp }}{% if not forloop.last %}<br>{% endif %}
+                  {% empty %}—{% endfor %}
+                </td>
+                <td>{{ spec.hores_estimades }}</td>
+                <td>{{ spec.show_sprints|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>Encara no hi ha cap spec en aquest projecte.</p>
+      {% endif %}
+
+      <div class="card blue-grey lighten-5">
+        <div class="card-content">
+          <span class="card-title">Nova spec</span>
+          <form method="post" action="{% url 'crea_spec' projecte.id %}">
+            {% csrf_token %}
+            <div class="row">
+              <div class="input-field col s12 m3">
+                <input type="number" name="ordre" id="spec-nou-ordre"
+                       value="{{ ordre_nova_spec }}" min="0" required>
+                <label for="spec-nou-ordre" class="active">Ordre</label>
+              </div>
+              <div class="input-field col s12 m6">
+                <input type="text" name="nom" id="spec-nou-nom" maxlength="600" required>
+                <label for="spec-nou-nom">Nom de la spec</label>
+              </div>
+              <div class="input-field col s12 m3">
+                <input type="number" name="hores_estimades" id="spec-nou-hores"
+                       value="0" min="0" step="0.5" required>
+                <label for="spec-nou-hores" class="active">Hores estimades</label>
+              </div>
+            </div>
+
+            <p class="grey-text">Descripció (opcional)</p>
+            {{ spec_descripcio_form.descripcio }}
+
+            <div class="row">
+              <div class="col s12 m6">
+                <div class="input-field">
+                  <input type="text" id="spec-mp-cerca" autocomplete="off">
+                  <label for="spec-mp-cerca" class="active">Mòduls professionals</label>
+                </div>
+                <ul id="spec-mp-resultats" class="collection" style="display: none;"></ul>
+                <div id="spec-mp-seleccionats" class="spec-chips"></div>
+              </div>
+              <div class="col s12 m6">
+                <div class="input-field">
+                  <input type="text" id="spec-sprints-cerca" autocomplete="off">
+                  <label for="spec-sprints-cerca" class="active">Sprints</label>
+                </div>
+                <ul id="spec-sprints-resultats" class="collection" style="display: none;"></ul>
+                <div id="spec-sprints-seleccionats" class="spec-chips"></div>
+              </div>
+            </div>
+
+            <button class="btn waves-effect waves-light" type="submit">
+              <i class="material-icons left">add</i>Afegeix la spec
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var input = document.getElementById("centre-cerca");
+    if (!input) {
+      return;
+    }
+
+    var hidden = document.getElementById("centre");
+    var resultats = document.getElementById("centre-resultats");
+    var temporitzador = null;
+    var peticio = 0;
+
+    function netejaResultats() {
+      resultats.innerHTML = "";
+      resultats.style.display = "none";
+    }
+
+    function mostraResultats(centres) {
+      resultats.innerHTML = "";
+
+      centres.forEach(function (centre) {
+        var item = document.createElement("li");
+        item.className = "collection-item";
+        item.style.cursor = "pointer";
+        item.textContent = centre.label;
+        item.addEventListener("click", function () {
+          hidden.value = centre.id;
+          input.value = centre.label;
+          netejaResultats();
+        });
+        resultats.appendChild(item);
+      });
+
+      if (centres.length) {
+        resultats.style.display = "block";
+      }
+    }
+
+    function cerca(terme) {
+      var actual = ++peticio;
+      fetch("{% url 'cerca_centres' %}?q=" + encodeURIComponent(terme))
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (actual !== peticio) {
+            return;
+          }
+          mostraResultats(data.results || []);
+        })
+        .catch(function () {
+          if (actual === peticio) {
+            mostraResultats([]);
+          }
+        });
+    }
+
+    input.addEventListener("input", function () {
+      hidden.value = "";
+      var terme = input.value.trim();
+      clearTimeout(temporitzador);
+      if (!terme) {
+        netejaResultats();
+        return;
+      }
+      temporitzador = setTimeout(function () {
+        cerca(terme);
+      }, 250);
+    });
+
+    input.addEventListener("blur", function () {
+      setTimeout(netejaResultats, 150);
+    });
+  })();
+
+  (function () {
+    var input = document.getElementById("cicle-cerca");
+    if (!input) {
+      return;
+    }
+
+    var hidden = document.getElementById("cicle");
+    var resultats = document.getElementById("cicle-resultats");
+    var temporitzador = null;
+    var peticio = 0;
+
+    function netejaResultats() {
+      resultats.innerHTML = "";
+      resultats.style.display = "none";
+    }
+
+    function mostraResultats(cicles) {
+      resultats.innerHTML = "";
+
+      cicles.forEach(function (cicle) {
+        var item = document.createElement("li");
+        item.className = "collection-item";
+        item.style.cursor = "pointer";
+        item.textContent = cicle.label;
+        item.addEventListener("click", function () {
+          hidden.value = cicle.id;
+          input.value = cicle.label;
+          netejaResultats();
+        });
+        resultats.appendChild(item);
+      });
+
+      if (cicles.length) {
+        resultats.style.display = "block";
+      }
+    }
+
+    function cerca(terme) {
+      var actual = ++peticio;
+      fetch("{% url 'cerca_cicles' %}?q=" + encodeURIComponent(terme))
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (actual !== peticio) {
+            return;
+          }
+          mostraResultats(data.results || []);
+        })
+        .catch(function () {
+          if (actual === peticio) {
+            mostraResultats([]);
+          }
+        });
+    }
+
+    input.addEventListener("input", function () {
+      hidden.value = "";
+      var terme = input.value.trim();
+      clearTimeout(temporitzador);
+      if (!terme) {
+        netejaResultats();
+        return;
+      }
+      temporitzador = setTimeout(function () {
+        cerca(terme);
+      }, 250);
+    });
+
+    input.addEventListener("blur", function () {
+      setTimeout(netejaResultats, 150);
+    });
+  })();
+
+  (function () {
+    function configura(opcions) {
+      var input = document.getElementById(opcions.input);
+      if (!input) {
+        return;
+      }
+
+      var resultats = document.getElementById(opcions.resultats);
+      var seleccionats = document.getElementById(opcions.seleccionats);
+      var temporitzador = null;
+      var peticio = 0;
+
+      function netejaResultats() {
+        resultats.innerHTML = "";
+        resultats.style.display = "none";
+      }
+
+      function afegeix(item) {
+        if (seleccionats.querySelector('input[value="' + item.id + '"]')) {
+          return;
+        }
+
+        var chip = document.createElement("span");
+        chip.className = "spec-chip";
+        chip.appendChild(document.createTextNode(item.label));
+
+        var boto = document.createElement("button");
+        boto.type = "button";
+        boto.textContent = "×";
+        boto.setAttribute("aria-label", "Treure " + item.label);
+        boto.addEventListener("click", function () {
+          chip.remove();
+        });
+        chip.appendChild(boto);
+
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = opcions.name;
+        hidden.value = item.id;
+        chip.appendChild(hidden);
+
+        seleccionats.appendChild(chip);
+      }
+
+      function mostraResultats(items) {
+        resultats.innerHTML = "";
+
+        items.forEach(function (item) {
+          var element = document.createElement("li");
+          element.className = "collection-item";
+          element.style.cursor = "pointer";
+          element.textContent = item.label;
+          element.addEventListener("click", function () {
+            afegeix(item);
+            input.value = "";
+            netejaResultats();
+          });
+          resultats.appendChild(element);
+        });
+
+        if (items.length) {
+          resultats.style.display = "block";
+        }
+      }
+
+      function cerca(terme) {
+        var actual = ++peticio;
+        fetch(opcions.url + "?q=" + encodeURIComponent(terme) +
+              "&projecte_id=" + encodeURIComponent(opcions.projecte))
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (data) {
+            if (actual !== peticio) {
+              return;
+            }
+            mostraResultats(data.results || []);
+          })
+          .catch(function () {
+            if (actual === peticio) {
+              mostraResultats([]);
+            }
+          });
+      }
+
+      input.addEventListener("input", function () {
+        var terme = input.value.trim();
+        clearTimeout(temporitzador);
+        if (!terme) {
+          netejaResultats();
+          return;
+        }
+        temporitzador = setTimeout(function () {
+          cerca(terme);
+        }, 250);
+      });
+
+      input.addEventListener("blur", function () {
+        setTimeout(netejaResultats, 150);
+      });
+    }
+
+    {% if projecte %}
+    configura({
+      input: "spec-mp-cerca",
+      resultats: "spec-mp-resultats",
+      seleccionats: "spec-mp-seleccionats",
+      name: "mp",
+      url: "{% url 'cerca_moduls' %}",
+      projecte: "{{ projecte.id }}"
+    });
+    configura({
+      input: "spec-sprints-cerca",
+      resultats: "spec-sprints-resultats",
+      seleccionats: "spec-sprints-seleccionats",
+      name: "sprints",
+      url: "{% url 'cerca_sprints' %}",
+      projecte: "{{ projecte.id }}"
+    });
+    {% endif %}
+  })();
+</script>
+{% endblock %}

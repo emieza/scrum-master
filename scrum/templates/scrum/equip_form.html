@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Nou equip · Scrum Master{% endblock %}
+
+{% block extra_css %}
+.membres-seleccionats {
+  min-height: 2rem;
+  margin: 1rem 0;
+}
+.membres-seleccionats .chip {
+  margin: 0 0.5rem 0.5rem 0;
+}
+#cerca-resultats {
+  margin-top: 0.5rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Nou equip</h2>
+    <p class="grey-text">
+      Crea un equip per a un projecte i afegeix-ne els membres cercant-los pel correu electrònic.
+    </p>
+
+    {% if errors %}
+      <div class="card-panel red lighten-4">
+        <ul class="browser-default">
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if projectes %}
+      <form method="post" id="form-equip">
+        {% csrf_token %}
+
+        <div class="input-field">
+          <input type="text" name="nom" id="nom" value="{{ dades.nom }}" maxlength="255" required>
+          <label for="nom" {% if dades.nom %}class="active"{% endif %}>Nom de l'equip</label>
+        </div>
+
+        <div class="input-field">
+          <select name="projecte" id="projecte" required>
+            <option value="" disabled {% if not dades.projecte %}selected{% endif %}>Tria un projecte</option>
+            {% for projecte in projectes %}
+              <option value="{{ projecte.id }}" {% if dades.projecte == projecte.id|stringformat:"s" %}selected{% endif %}>
+                {{ projecte.nom }}
+              </option>
+            {% endfor %}
+          </select>
+          <label>Projecte</label>
+        </div>
+
+        <div class="input-field">
+          <textarea name="descripcio" id="descripcio" class="materialize-textarea">{{ dades.descripcio }}</textarea>
+          <label for="descripcio" {% if dades.descripcio %}class="active"{% endif %}>Descripció (opcional)</label>
+        </div>
+
+        <h5>Membres</h5>
+        <div id="membres-seleccionats" class="membres-seleccionats"></div>
+
+        <div class="input-field">
+          <input type="text" id="cerca-email" autocomplete="off" inputmode="email">
+          <label for="cerca-email">Cerca usuari per email</label>
+        </div>
+        <p id="cerca-ajuda" class="grey-text">
+          Els usuaris només apareixeran quan la cerca coincideixi amb un únic correu.
+        </p>
+        <ul id="cerca-resultats" class="collection" style="display: none;"></ul>
+
+        <button class="btn waves-effect waves-light" type="submit">
+          <i class="material-icons left">group_add</i>Crea l'equip
+        </button>
+      </form>
+    {% else %}
+      <div class="card-panel">
+        No tens cap projecte on puguis crear equips.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var input = document.getElementById("cerca-email");
+    if (!input) {
+      return;
+    }
+
+    var seleccionats = document.getElementById("membres-seleccionats");
+    var resultats = document.getElementById("cerca-resultats");
+    var ajuda = document.getElementById("cerca-ajuda");
+    var ajudaBase = ajuda.textContent.trim();
+    var temporitzador = null;
+    var peticio = 0;
+
+    function netejaResultats() {
+      resultats.innerHTML = "";
+      resultats.style.display = "none";
+      ajuda.textContent = ajudaBase;
+    }
+
+    function afegeixMembre(usuari) {
+      var existent = seleccionats.querySelector(
+        'input[name="membres"][value="' + usuari.id + '"]'
+      );
+      if (!existent) {
+        var chip = document.createElement("div");
+        chip.className = "chip";
+        chip.appendChild(document.createTextNode(usuari.email));
+
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "membres";
+        hidden.value = usuari.id;
+        chip.appendChild(hidden);
+
+        var close = document.createElement("i");
+        close.className = "close material-icons";
+        close.textContent = "close";
+        close.setAttribute("role", "button");
+        close.setAttribute("aria-label", "Treu " + usuari.email);
+        close.addEventListener("click", function () {
+          chip.remove();
+        });
+        chip.appendChild(close);
+
+        seleccionats.appendChild(chip);
+      }
+
+      input.value = "";
+      netejaResultats();
+      input.focus();
+    }
+
+    function mostraResultats(usuaris) {
+      resultats.innerHTML = "";
+
+      if (usuaris.length === 1) {
+        var usuari = usuaris[0];
+        var item = document.createElement("li");
+        item.className = "collection-item";
+        item.style.cursor = "pointer";
+        item.textContent = usuari.email;
+        if (usuari.nom && usuari.nom !== usuari.email) {
+          item.textContent += " · " + usuari.nom;
+        }
+        item.addEventListener("click", function () {
+          afegeixMembre(usuari);
+        });
+        resultats.appendChild(item);
+        resultats.style.display = "block";
+        ajuda.textContent = "Fes clic per afegir aquest usuari.";
+      } else {
+        resultats.style.display = "none";
+        ajuda.textContent = ajudaBase;
+      }
+    }
+
+    function cerca(terme) {
+      var actual = ++peticio;
+      fetch("{% url 'cerca_usuaris' %}?q=" + encodeURIComponent(terme))
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (actual !== peticio) {
+            return;
+          }
+          mostraResultats(data.results || []);
+        })
+        .catch(function () {
+          if (actual === peticio) {
+            mostraResultats([]);
+          }
+        });
+    }
+
+    input.addEventListener("input", function () {
+      var terme = input.value.trim();
+      clearTimeout(temporitzador);
+      if (!terme) {
+        netejaResultats();
+        return;
+      }
+      temporitzador = setTimeout(function () {
+        cerca(terme);
+      }, 250);
+    });
+
+    input.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      var item = resultats.querySelector(".collection-item");
+      if (item) {
+        item.click();
+      }
+    });
+
+    input.addEventListener("blur", function () {
+      setTimeout(netejaResultats, 150);
+    });
+  })();
+</script>
+{% endblock %}

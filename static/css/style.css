@@ -37,3 +37,60 @@ table.striped > tbody > tr > td {
 .card table.striped > tbody > tr:nth-child(odd) {
   background-color: rgba(255, 255, 255, 0.08);
 }
+
+.rich-text ul,
+.rich-text ol,
+.ck-content ul,
+.ck-content ol,
+.ck-editor__editable ul,
+.ck-editor__editable ol {
+  margin: 1rem 0;
+  padding-left: 2rem;
+}
+
+.rich-text ul:not(.browser-default),
+.ck-content ul:not(.browser-default),
+.ck-editor__editable ul:not(.browser-default) {
+  list-style-type: disc;
+}
+
+.rich-text ul:not(.browser-default) > li,
+.ck-content ul:not(.browser-default) > li,
+.ck-editor__editable ul:not(.browser-default) > li {
+  display: list-item;
+  list-style-type: disc;
+}
+
+.rich-text ol:not(.browser-default),
+.ck-content ol:not(.browser-default),
+.ck-editor__editable ol:not(.browser-default) {
+  list-style-type: decimal;
+}
+
+.rich-text ol:not(.browser-default) > li,
+.ck-content ol:not(.browser-default) > li,
+.ck-editor__editable ol:not(.browser-default) > li {
+  display: list-item;
+  list-style-type: decimal;
+}
+
+.rich-text ul ul:not(.browser-default),
+.ck-content ul ul:not(.browser-default),
+.ck-editor__editable ul ul:not(.browser-default) {
+  list-style-type: circle;
+}
+
+.rich-text ul ul:not(.browser-default) > li,
+.ck-content ul ul:not(.browser-default) > li,
+.ck-editor__editable ul ul:not(.browser-default) > li {
+  list-style-type: circle;
+}
+
+.rich-text strong,
+.rich-text b,
+.ck-content strong,
+.ck-content b,
+.ck-editor__editable strong,
+.ck-editor__editable b {
+  font-weight: 700 !important;
+}

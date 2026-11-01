@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Els meus equips · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <div class="row valign-wrapper">
+      <div class="col s12 m8">
+        <h2>Els meus equips</h2>
+        <p class="grey-text">Equips dels quals formes part.</p>
+      </div>
+      <div class="col s12 m4 right-align">
+        <a class="btn waves-effect waves-light" href="{% url 'crea_equip' %}">
+          <i class="material-icons left">group_add</i>Crea equip
+        </a>
+      </div>
+    </div>
+
+    {% for equip in equips %}
+      <div class="card">
+        <div class="card-content">
+          <span class="card-title">
+            <a href="{% url 'projecte' equip.projecte.id %}">{{ equip.nom }}</a>
+          </span>
+          <p class="grey-text">
+            {{ equip.projecte.nom }}
+            {% if equip.projecte.centre %}· {{ equip.projecte.centre }}{% endif %}
+          </p>
+          {% if equip.descripcio %}
+            <p>{{ equip.descripcio }}</p>
+          {% endif %}
+          <div class="chips">
+            {% for membre in equip.membres.all %}
+              <div class="chip">
+                {{ membre.nom_complert|default:membre.email }}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="card-panel">
+        Encara no formes part de cap equip.
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

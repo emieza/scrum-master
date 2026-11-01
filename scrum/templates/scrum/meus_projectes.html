@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Els meus projectes · Scrum Master{% endblock %}
+
+{% block extra_css %}
+#projectes-taula .accions form {
+  display: inline;
+}
+#projectes-taula .accions .btn-floating {
+  margin-left: 0.25rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <div class="row valign-wrapper">
+      <div class="col s12 m8">
+        <h2>Els meus projectes</h2>
+        <p class="grey-text">Projectes que administres.</p>
+      </div>
+      <div class="col s12 m4 right-align">
+        <a class="btn waves-effect waves-light" href="{% url 'crea_projecte' %}">
+          <i class="material-icons left">add</i>Nou projecte
+        </a>
+      </div>
+    </div>
+
+    <table id="projectes-taula" class="striped responsive-table">
+      <thead>
+        <tr>
+          <th>Nom projecte</th>
+          <th>Cicle i centre</th>
+          <th>Dates inici - final</th>
+          <th>Accions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for projecte in projectes %}
+          <tr>
+            <td>
+              <a class="title" href="{% url 'projecte' projecte.id %}">{{ projecte.nom }}</a>
+            </td>
+            <td>
+              {{ projecte.cicle|default:"—" }}<br>
+              <span class="grey-text">{{ projecte.centre|default:"Sense centre" }}</span>
+            </td>
+            <td>
+              <span class="grey-text">
+                Inici: {{ projecte.inici|date:"j \d\e F \d\e Y" }}<br>
+                Final: {{ projecte.final|date:"j \d\e F \d\e Y" }}
+              </span>
+            </td>
+            <td class="accions">
+              <a class="btn-floating btn-small waves-effect blue" title="Visualitza el projecte"
+                 href="{% url 'projecte' projecte.id %}">
+                <i class="material-icons">visibility</i>
+              </a>
+              <a class="btn-floating btn-small waves-effect orange" title="Edita el projecte"
+                 href="{% url 'edita_projecte' projecte.id %}">
+                <i class="material-icons">edit</i>
+              </a>
+              <form method="post" action="{% url 'elimina_projecte' projecte.id %}"
+                    onsubmit="return confirm('Segur que vols eliminar aquest projecte?');">
+                {% csrf_token %}
+                <button class="btn-floating btn-small waves-effect red" type="submit"
+                        title="Elimina el projecte">
+                  <i class="material-icons">delete</i>
+                </button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">Encara no administres cap projecte.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

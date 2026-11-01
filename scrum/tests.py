@@ -425,3 +425,887 @@ class ScrumTests(TestCase):
         textos = [resultat["text"] for resultat in response.json()["results"]]
         self.assertIn("Sprint 1", textos)
         self.assertNotIn("Sprint extern", textos)
+
+    def test_crea_equip_requereix_login(self):
+        response = self.client.get(reverse("crea_equip"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_crea_equip_amb_membres(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        alumne = User.objects.create_user(
+            username="alumne",
+            email="alumne@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_equip"),
+            {
+                "nom": "Equip Nou",
+                "descripcio": "Descripció de l'equip",
+                "projecte": self.projecte.id,
+                "membres": [self.user.id, alumne.id],
+            },
+        )
+        self.assertRedirects(response, reverse("crea_equip"))
+        equip = Equip.objects.get(nom="Equip Nou")
+        self.assertEqual(equip.projecte, self.projecte)
+        self.assertEqual(equip.descripcio, "Descripció de l'equip")
+        self.assertEqual(set(equip.membres.all()), {self.user, alumne})
+
+    def test_crea_equip_afegeix_el_creador_com_a_membre(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_equip"),
+            {"nom": "Equip del creador", "projecte": self.projecte.id},
+        )
+        self.assertRedirects(response, reverse("crea_equip"))
+        equip = Equip.objects.get(nom="Equip del creador")
+        self.assertIn(self.user, equip.membres.all())
+
+    def test_crea_equip_no_permet_projectes_d_un_altre_centre(self):
+        altre_centre = Centre.objects.create(
+            nom="Institut Altre",
+            poblacio="Tarragona",
+            cp="43001",
+            email="altre@example.cat",
+        )
+        altre_projecte = Projecte.objects.create(
+            nom="Projecte aliè",
+            centre=altre_centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_equip"),
+            {"nom": "Equip intrus", "projecte": altre_projecte.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Equip.objects.filter(nom="Equip intrus").exists())
+
+    def test_crea_equip_mostra_els_projectes_del_centre(self):
+        altre_centre = Centre.objects.create(
+            nom="Institut Altre",
+            poblacio="Tarragona",
+            cp="43001",
+            email="altre@example.cat",
+        )
+        projecte_del_centre = Projecte.objects.create(
+            nom="Projecte del centre",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        projecte_altre_centre = Projecte.objects.create(
+            nom="Projecte d'un altre centre",
+            centre=altre_centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        projecte_sense_centre = Projecte.objects.create(
+            nom="Projecte sense centre",
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("crea_equip"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.projecte.nom)
+        self.assertContains(response, projecte_del_centre.nom)
+        self.assertNotContains(response, projecte_altre_centre.nom)
+        self.assertNotContains(response, projecte_sense_centre.nom)
+
+    def test_crea_equip_sense_centre_mostra_projectes_sense_centre(self):
+        projecte_sense_centre = Projecte.objects.create(
+            nom="Projecte sense centre",
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("crea_equip"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, projecte_sense_centre.nom)
+        self.assertNotContains(response, self.projecte.nom)
+
+    def test_els_meus_equips_requereix_login(self):
+        response = self.client.get(reverse("els_meus_equips"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_els_meus_equips_mostra_nomes_els_equips_propis(self):
+        equip_propi = Equip.objects.create(nom="Equip Propi", projecte=self.projecte)
+        equip_propi.membres.add(self.user)
+        altre_usuari = User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        equip_altre = Equip.objects.create(nom="Equip Altre", projecte=self.projecte)
+        equip_altre.membres.add(altre_usuari)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_equips"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Equip Propi")
+        self.assertNotContains(response, "Equip Altre")
+
+    def test_els_meus_equips_te_boto_per_crear_un_equip(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_equips"))
+        self.assertContains(response, reverse("crea_equip"))
+        self.assertContains(response, "Crea equip")
+
+    def test_navbar_mostra_els_meus_equips(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("els_meus_equips"))
+        self.assertContains(response, "Els meus equips")
+        self.assertNotContains(response, "Nou equip")
+
+    def test_els_meus_projectes_requereix_login(self):
+        response = self.client.get(reverse("els_meus_projectes"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_els_meus_projectes_mostra_nomes_els_administrats(self):
+        altre_usuari = User.objects.create_user(
+            username="altre-admin",
+            email="altre-admin@example.cat",
+            password="contrasenya123",
+        )
+        projecte_altre = Projecte.objects.create(
+            nom="Projecte d'un altre",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        projecte_altre.admins.add(altre_usuari)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_projectes"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.projecte.nom)
+        self.assertNotContains(response, projecte_altre.nom)
+
+    def test_els_meus_projectes_te_boto_per_crear_un_projecte(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_projectes"))
+        self.assertContains(response, reverse("crea_projecte"))
+        self.assertContains(response, "Nou projecte")
+
+    def test_els_meus_projectes_mostra_les_accions_de_cada_projecte(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_projectes"))
+        self.assertNotContains(response, "Go!")
+        self.assertContains(response, reverse("projecte", args=[self.projecte.id]))
+        self.assertContains(
+            response, reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(
+            response, reverse("elimina_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(response, "Segur que vols eliminar aquest projecte?")
+
+    def test_edita_projecte_requereix_login(self):
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_edita_projecte_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_edita_projecte_actualitza_les_dades(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(response, "Edita el projecte")
+        self.assertContains(response, self.projecte.nom)
+
+        response = self.client.post(
+            reverse("edita_projecte", args=[self.projecte.id]),
+            {
+                "nom": "Projecte actualitzat",
+                "descripcio": "Nova descripció",
+                "centre": str(self.centre.pk),
+                "cicle": str(self.cicle.pk),
+                "inici": "2026-03-01",
+                "final": "2026-04-01",
+            },
+        )
+        self.assertRedirects(response, reverse("els_meus_projectes"))
+        self.projecte.refresh_from_db()
+        self.assertEqual(self.projecte.nom, "Projecte actualitzat")
+        self.assertEqual(self.projecte.descripcio, "Nova descripció")
+        self.assertEqual(self.projecte.inici, datetime.date(2026, 3, 1))
+        self.assertEqual(self.projecte.final, datetime.date(2026, 4, 1))
+
+    def test_edita_projecte_mostra_la_seccio_de_sprints(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(response, "Sprints")
+        self.assertContains(response, self.sprint.nom)
+        self.assertContains(
+            response, reverse("crea_sprint", args=[self.projecte.id])
+        )
+        self.assertContains(response, reverse("edita_sprint", args=[self.sprint.id]))
+        self.assertNotContains(response, "sprint-nou-notes")
+        self.assertNotContains(response, "sprint-notes-{}".format(self.sprint.id))
+
+    def test_crea_sprint_requereix_login(self):
+        response = self.client.post(
+            reverse("crea_sprint", args=[self.projecte.id]),
+            {"nom": "Sprint nou", "inici": "2026-01-01", "final": "2026-01-07"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Sprint.objects.filter(nom="Sprint nou").exists())
+
+    def test_crea_sprint_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_sprint", args=[self.projecte.id]),
+            {"nom": "Sprint nou", "inici": "2026-01-01", "final": "2026-01-07"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_crea_sprint_amb_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_sprint", args=[self.projecte.id]),
+            {
+                "nom": "Sprint nou",
+                "inici": "2026-01-01",
+                "final": "2026-01-07",
+            },
+        )
+        self.assertRedirects(
+            response, reverse("edita_projecte", args=[self.projecte.id])
+        )
+        sprint = Sprint.objects.get(nom="Sprint nou")
+        self.assertEqual(sprint.projecte, self.projecte)
+        self.assertEqual(sprint.inici, datetime.date(2026, 1, 1))
+        self.assertEqual(sprint.final, datetime.date(2026, 1, 7))
+
+    def test_edita_sprint_requereix_login(self):
+        response = self.client.post(
+            reverse("edita_sprint", args=[self.sprint.id]),
+            {"nom": "Canviat", "inici": "2026-01-01", "final": "2026-01-07"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.nom, "Sprint 1")
+
+    def test_edita_sprint_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_sprint", args=[self.sprint.id]),
+            {"nom": "Canviat", "inici": "2026-01-01", "final": "2026-01-07"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_edita_sprint_amb_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_sprint", args=[self.sprint.id]),
+            {
+                "nom": "Sprint actualitzat",
+                "inici": "2026-02-01",
+                "final": "2026-02-14",
+            },
+        )
+        self.assertRedirects(
+            response, reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.nom, "Sprint actualitzat")
+        self.assertEqual(self.sprint.inici, datetime.date(2026, 2, 1))
+        self.assertEqual(self.sprint.final, datetime.date(2026, 2, 14))
+
+    def test_edita_projecte_mostra_la_seccio_de_specs(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertContains(response, "Nova spec")
+        self.assertContains(response, self.spec.nom, html=True)
+        self.assertContains(
+            response, reverse("crea_spec", args=[self.projecte.id])
+        )
+        self.assertContains(response, 'id="spec-nou-nom"')
+        self.assertContains(response, 'id="spec-mp-cerca"')
+        self.assertContains(response, 'id="spec-sprints-cerca"')
+        self.assertContains(response, reverse("cerca_moduls"))
+        self.assertContains(response, reverse("cerca_sprints"))
+        self.assertContains(
+            response, "<h3>{}</h3>".format(self.projecte.nom), html=True
+        )
+        contingut = response.content.decode()
+        self.assertLess(
+            contingut.index("<h4>Sprints</h4>"),
+            contingut.index("<h4>Specs</h4>"),
+        )
+
+    def test_crea_spec_requereix_login(self):
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {"nom": "Spec nova", "ordre": "2", "hores_estimades": "4"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Spec.objects.filter(nom="Spec nova").exists())
+
+    def test_crea_spec_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {"nom": "Spec nova", "ordre": "2", "hores_estimades": "4"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_crea_spec_amb_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {
+                "nom": "Spec nova",
+                "descripcio": "Descripció de la spec",
+                "ordre": "2",
+                "hores_estimades": "4.5",
+                "mp": [str(self.mp.id)],
+                "sprints": [str(self.sprint.id)],
+            },
+        )
+        self.assertRedirects(
+            response, reverse("edita_projecte", args=[self.projecte.id])
+        )
+        spec = Spec.objects.get(nom="Spec nova")
+        self.assertEqual(spec.projecte, self.projecte)
+        self.assertEqual(spec.descripcio, "Descripció de la spec")
+        self.assertEqual(spec.ordre, 2)
+        self.assertEqual(spec.hores_estimades, 4.5)
+        self.assertIn(self.mp, spec.mp.all())
+        self.assertIn(self.sprint, spec.sprints.all())
+
+    def test_crea_spec_valida_les_dades(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {"nom": "", "ordre": "-1", "hores_estimades": "-2"},
+        )
+        self.assertRedirects(
+            response, reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertFalse(Spec.objects.filter(projecte=self.projecte, nom="").exists())
+
+    def test_elimina_projecte_requereix_login(self):
+        response = self.client.post(
+            reverse("elimina_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Projecte.objects.filter(pk=self.projecte.pk).exists())
+
+    def test_elimina_projecte_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("elimina_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Projecte.objects.filter(pk=self.projecte.pk).exists())
+
+    def test_elimina_projecte_amb_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("elimina_projecte", args=[self.projecte.id])
+        )
+        self.assertRedirects(response, reverse("els_meus_projectes"))
+        self.assertTrue(Projecte.objects.filter(pk=self.projecte.pk).exists())
+
+        response = self.client.post(
+            reverse("elimina_projecte", args=[self.projecte.id])
+        )
+        self.assertRedirects(response, reverse("els_meus_projectes"))
+        self.assertFalse(Projecte.objects.filter(pk=self.projecte.pk).exists())
+
+    def test_crea_projecte_requereix_login(self):
+        response = self.client.get(reverse("crea_projecte"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_crea_projecte_mostra_l_autocompletat_de_centre(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("crea_projecte"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="centre-cerca"')
+        self.assertContains(response, 'id="centre-resultats"')
+        self.assertContains(response, reverse("cerca_centres"))
+        self.assertContains(response, 'value="{}"'.format(self.centre))
+
+    def test_crea_projecte_mostra_l_autocompletat_de_cicle(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("crea_projecte"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="cicle-cerca"')
+        self.assertContains(response, 'id="cicle-resultats"')
+        self.assertContains(response, reverse("cerca_cicles"))
+
+    def test_formularis_de_descripcio_amb_editor_enriquit(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("crea_projecte"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="projecte_descripcio"')
+        self.assertContains(response, "django_ckeditor_5")
+
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="projecte_descripcio"')
+        self.assertContains(response, 'id="spec_descripcio"')
+
+    def test_crea_projecte_afegeix_el_creador_com_a_administrador(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_projecte"),
+            {
+                "nom": "Projecte Nou",
+                "descripcio": "Descripció del projecte",
+                "centre": str(self.centre.pk),
+                "cicle": str(self.cicle.pk),
+                "inici": "2026-01-10",
+                "final": "2026-02-10",
+            },
+        )
+        self.assertRedirects(response, reverse("els_meus_projectes"))
+        projecte = Projecte.objects.get(nom="Projecte Nou")
+        self.assertEqual(projecte.descripcio, "Descripció del projecte")
+        self.assertEqual(projecte.centre, self.centre)
+        self.assertEqual(projecte.cicle, self.cicle)
+        self.assertEqual(projecte.inici, datetime.date(2026, 1, 10))
+        self.assertEqual(projecte.final, datetime.date(2026, 2, 10))
+        self.assertIn(self.user, projecte.admins.all())
+
+    def test_crea_projecte_usa_el_centre_de_l_usuari_per_defecte(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_projecte"),
+            {
+                "nom": "Projecte sense centre",
+                "inici": "2026-01-10",
+                "final": "2026-02-10",
+            },
+        )
+        self.assertRedirects(response, reverse("els_meus_projectes"))
+        projecte = Projecte.objects.get(nom="Projecte sense centre")
+        self.assertEqual(projecte.centre, self.centre)
+        self.assertIsNone(projecte.cicle)
+
+    def test_crea_projecte_valida_les_dades(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_projecte"),
+            {"nom": "", "inici": "", "final": "2026-01-10"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "El nom del projecte és obligatori.")
+        self.assertContains(response, "La data d&#x27;inici no és vàlida.")
+
+        response = self.client.post(
+            reverse("crea_projecte"),
+            {
+                "nom": "Dates incorrectes",
+                "inici": "2026-02-10",
+                "final": "2026-01-10",
+            },
+        )
+        self.assertContains(
+            response, "La data final ha de ser posterior a la data d&#x27;inici."
+        )
+
+    def test_navbar_mostra_els_meus_projectes(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("els_meus_projectes"))
+        self.assertContains(response, "Els meus projectes")
+
+    def test_cerca_usuaris_mostra_email_amb_una_unica_coincidencia(self):
+        unica = User.objects.create_user(
+            username="unica",
+            email="unica@example.cat",
+            password="contrasenya123",
+        )
+        User.objects.create_user(
+            username="unica2",
+            email="unica2@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("cerca_usuaris"), {"q": "unica@"})
+        self.assertEqual(response.status_code, 200)
+        resultats = response.json()["results"]
+        self.assertEqual(len(resultats), 1)
+        self.assertEqual(resultats[0]["email"], unica.email)
+
+    def test_cerca_usuaris_amaga_emails_amb_mes_duna_coincidencia(self):
+        User.objects.create_user(
+            username="unica",
+            email="unica@example.cat",
+            password="contrasenya123",
+        )
+        User.objects.create_user(
+            username="unica2",
+            email="unica2@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("cerca_usuaris"), {"q": "example.cat"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_cerca_usuaris_requereix_login(self):
+        response = self.client.get(reverse("cerca_usuaris"), {"q": "profe@"})
+        self.assertEqual(response.status_code, 302)
+
+    def test_perfil_requereix_login(self):
+        response = self.client.get(reverse("perfil"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_perfil_mostra_les_dades_de_l_usuari(self):
+        self.user.first_name = "Anna"
+        self.user.last_name = "Pérez"
+        self.user.centre = self.centre
+        self.user.save()
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("perfil"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Anna"')
+        self.assertContains(response, 'value="Pérez"')
+        self.assertContains(response, self.centre.nom)
+
+    def test_perfil_actualitza_nom_cognom_i_centre(self):
+        altre_centre = Centre.objects.create(
+            nom="Institut Nou",
+            poblacio="Girona",
+            cp="17001",
+            email="info@nou.cat",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {
+                "first_name": "Anna",
+                "last_name": "Pérez",
+                "centre": altre_centre.id,
+            },
+        )
+        self.assertRedirects(response, reverse("perfil"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Anna")
+        self.assertEqual(self.user.last_name, "Pérez")
+        self.assertEqual(self.user.centre, altre_centre)
+
+    def test_perfil_accepta_deixar_el_centre_buit(self):
+        self.user.centre = self.centre
+        self.user.save()
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {"first_name": "Anna", "last_name": "Pérez", "centre": ""},
+        )
+        self.assertRedirects(response, reverse("perfil"))
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.centre)
+
+    def test_perfil_rebutja_un_centre_inexistent(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {"first_name": "Anna", "last_name": "Pérez", "centre": "999999"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tria un centre educatiu vàlid.")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "")
+
+    def test_perfil_crea_un_centre_nou(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {
+                "first_name": "Anna",
+                "last_name": "Pérez",
+                "nou_centre_nom": "Institut Nou",
+                "nou_centre_poblacio": "Girona",
+                "nou_centre_cp": "17001",
+                "nou_centre_email": "info@nou.cat",
+            },
+        )
+        self.assertRedirects(response, reverse("perfil"))
+        centre = Centre.objects.get(nom="Institut Nou")
+        self.assertEqual(centre.poblacio, "Girona")
+        self.assertEqual(centre.cp, "17001")
+        self.assertEqual(centre.email, "info@nou.cat")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.centre, centre)
+
+    def test_perfil_crea_un_centre_amb_tots_els_camps(self):
+        cicle = Cicle.objects.create(
+            grau="CFGS",
+            codi="CFGS-001",
+            nom="Desenvolupament d'Aplicacions Web",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {
+                "first_name": "Anna",
+                "last_name": "Pérez",
+                "nou_centre_nom": "Institut Complet",
+                "nou_centre_direccio": "Carrer Major, 1",
+                "nou_centre_poblacio": "Girona",
+                "nou_centre_cp": "17001",
+                "nou_centre_telefon": "972 20 20 20",
+                "nou_centre_codi": "17001234",
+                "nou_centre_email": "info@complet.cat",
+                "nou_centre_web": "https://complet.cat",
+                "nou_centre_descripcio": "Centre de prova",
+                "nou_centre_imatge": "https://complet.cat/logo.png",
+                "nou_centre_cicles": [str(cicle.pk)],
+            },
+        )
+        self.assertRedirects(response, reverse("perfil"))
+        centre = Centre.objects.get(nom="Institut Complet")
+        self.assertEqual(centre.direccio, "Carrer Major, 1")
+        self.assertEqual(centre.poblacio, "Girona")
+        self.assertEqual(centre.cp, "17001")
+        self.assertEqual(centre.telefon, "972 20 20 20")
+        self.assertEqual(centre.codi, 17001234)
+        self.assertEqual(centre.email, "info@complet.cat")
+        self.assertEqual(centre.web, "https://complet.cat")
+        self.assertEqual(centre.descripcio, "Centre de prova")
+        self.assertEqual(centre.imatge, "https://complet.cat/logo.png")
+        self.assertIn(cicle, centre.cicles.all())
+
+    def test_perfil_valida_el_centre_nou(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {
+                "first_name": "Anna",
+                "last_name": "Pérez",
+                "nou_centre_nom": "Institut Nou",
+                "nou_centre_poblacio": "",
+                "nou_centre_cp": "123",
+                "nou_centre_email": "no-valid",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "La població del centre és obligatòria.")
+        self.assertContains(response, "El codi postal ha de tenir 5 dígits.")
+        self.assertContains(response, "El correu del centre no és vàlid.")
+        self.assertFalse(Centre.objects.filter(nom="Institut Nou").exists())
+
+    def test_cerca_centres_filtra_per_nom_i_poblacio(self):
+        Centre.objects.create(
+            nom="Institut del Bosc",
+            poblacio="Girona",
+            cp="17001",
+            email="bosc@example.cat",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("cerca_centres"), {"q": "Girona"})
+        self.assertEqual(response.status_code, 200)
+        resultats = response.json()["results"]
+        self.assertEqual(len(resultats), 1)
+        self.assertEqual(resultats[0]["nom"], "Institut del Bosc")
+
+    def test_cerca_centres_requereix_login(self):
+        response = self.client.get(reverse("cerca_centres"), {"q": "Exemple"})
+        self.assertEqual(response.status_code, 302)
+
+    def test_cerca_cicles_filtra_per_nom_codi_i_grau(self):
+        cicle = Cicle.objects.create(
+            grau="CFGM",
+            codi="CFGM-001",
+            nom="Sistemes Microinformàtics i Xarxes",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        for terme in ("Microinformàtics", "CFGM-001", "CFGM"):
+            response = self.client.get(reverse("cerca_cicles"), {"q": terme})
+            self.assertEqual(response.status_code, 200)
+            resultats = response.json()["results"]
+            self.assertEqual(len(resultats), 1)
+            self.assertEqual(resultats[0]["id"], cicle.pk)
+
+    def test_cerca_cicles_requereix_login(self):
+        response = self.client.get(reverse("cerca_cicles"), {"q": "CFGS"})
+        self.assertEqual(response.status_code, 302)
+
+    def test_cerca_moduls_filtra_pel_projecte(self):
+        altre_cicle = Cicle.objects.create(
+            grau="CFGM", codi="SMX", nom="Sistemes Microinformàtics"
+        )
+        altre_mp = ModulProfessional.objects.create(
+            numero=1, nom="Mòdul d'un altre cicle", cicle=altre_cicle
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("cerca_moduls"),
+            {"q": "web", "projecte_id": self.projecte.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [resultat["id"] for resultat in response.json()["results"]]
+        self.assertIn(self.mp.id, ids)
+        self.assertNotIn(altre_mp.id, ids)
+
+    def test_cerca_sprints_filtra_pel_projecte(self):
+        altre_projecte = Projecte.objects.create(
+            nom="Altre projecte",
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        Sprint.objects.create(
+            nom="Sprint d'un altre projecte",
+            projecte=altre_projecte,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=7),
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("cerca_sprints"),
+            {"q": "Sprint", "projecte_id": self.projecte.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [resultat["id"] for resultat in response.json()["results"]]
+        self.assertEqual(ids, [self.sprint.id])
+
+    def test_cerca_moduls_i_sprints_requereixen_login(self):
+        for nom in ("cerca_moduls", "cerca_sprints"):
+            response = self.client.get(
+                reverse(nom), {"q": "Sprint", "projecte_id": self.projecte.id}
+            )
+            self.assertEqual(response.status_code, 302)
+
+    def test_cerca_moduls_i_sprints_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        for nom in ("cerca_moduls", "cerca_sprints"):
+            response = self.client.get(
+                reverse(nom), {"q": "Sprint", "projecte_id": self.projecte.id}
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_perfil_mante_els_cicles_seleccionats_si_hi_ha_errors(self):
+        cicle = Cicle.objects.create(
+            grau="CFGS",
+            codi="CFGS-001",
+            nom="Desenvolupament d'Aplicacions Web",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("perfil"),
+            {
+                "first_name": "Anna",
+                "last_name": "Pérez",
+                "nou_centre_nom": "Institut Complet",
+                "nou_centre_poblacio": "",
+                "nou_centre_cp": "17001",
+                "nou_centre_email": "info@complet.cat",
+                "nou_centre_cicles": [str(cicle.pk)],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<input type="hidden" name="nou_centre_cicles" value="{}"'.format(cicle.pk),
+            html=False,
+        )
+
+    def test_perfil_mostra_l_autocompletat_i_el_formulari_de_centre(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("perfil"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="centre-cerca"')
+        self.assertContains(response, reverse("cerca_centres"))
+        self.assertContains(response, 'name="nou_centre_nom"')
+        self.assertContains(response, 'name="nou_centre_direccio"')
+        self.assertContains(response, 'name="nou_centre_poblacio"')
+        self.assertContains(response, 'name="nou_centre_cp"')
+        self.assertContains(response, 'name="nou_centre_telefon"')
+        self.assertContains(response, 'name="nou_centre_codi"')
+        self.assertContains(response, 'name="nou_centre_email"')
+        self.assertContains(response, 'name="nou_centre_web"')
+        self.assertContains(response, 'name="nou_centre_descripcio"')
+        self.assertContains(response, 'name="nou_centre_imatge"')
+        self.assertNotContains(response, "nou_centre_admins")
+        self.assertContains(response, 'id="cicle-cerca"')
+        self.assertContains(response, 'id="cicle-resultats"')
+        self.assertContains(response, reverse("cerca_cicles"))
+        self.assertContains(response, "són obligatoris")
+        self.assertContains(response, "Crea un nou centre educatiu")
+
+    def test_perfil_carrega_amb_un_usuari_sense_nom_ni_centre(self):
+        usuari = User.objects.create_user(
+            username="sense-dades",
+            email="sense-dades@example.cat",
+            password="contrasenya123",
+        )
+        self.client.force_login(usuari)
+        response = self.client.get(reverse("perfil"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value=""')
+
+    def test_navbar_mostra_l_enllac_al_perfil(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("perfil"))

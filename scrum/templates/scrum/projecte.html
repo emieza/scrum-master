@@ -52,7 +52,7 @@
 
     <div class="card-panel light-blue lighten-4">
       <h4><a class="anchor" id="descripcio">Descripció</a></h4>
-      {{ projecte.descripcio|safe }}
+      <div class="rich-text">{{ projecte.descripcio|safe }}</div>
     </div>
 
     {% for sprint in projecte.sprints.all %}
@@ -81,13 +81,14 @@
                 {{ spec.ordre }}. {{ spec.nom }}
               </a>
             </h6>
-            <div>{{ spec.descripcio|safe }}</div>
+            <div class="rich-text">{{ spec.descripcio|safe }}</div>
             <div>
               <p>
                 <span>Hores estimades: {{ spec.hores_estimades }}</span>
-                <span style="margin-left: 1.5rem;">Mòduls:
-                  {% for mp in spec.mp.all %}{{ mp.nom|slice:"0:4" }} {% endfor %}
-                </span>
+                <span style="margin-left: 1.5rem;">Mòduls:</span>
+                {% for mp in spec.mp.all %}
+                  <span class="chip">{{ mp }}</span>
+                {% endfor %}
               </p>
             </div>
 

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil · Scrum Master{% endblock %}
+
+{% block extra_css %}
+#centre-resultats,
+#cicle-resultats {
+  position: relative;
+  z-index: 10;
+  margin-top: -1rem;
+}
+#nou-centre-panel {
+  margin-top: 1.5rem;
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+}
+.panel-title .material-icons {
+  margin-right: 0.5rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Perfil</h2>
+    <p class="grey-text">
+      Modifica les teves dades personals i el centre educatiu.
+    </p>
+
+    {% if errors %}
+      <div class="card-panel red lighten-4">
+        <ul class="browser-default">
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="input-field">
+        <input type="text" name="first_name" id="first_name" value="{{ dades.first_name }}" maxlength="150" required>
+        <label for="first_name" {% if dades.first_name %}class="active"{% endif %}>Nom</label>
+      </div>
+
+      <div class="input-field">
+        <input type="text" name="last_name" id="last_name" value="{{ dades.last_name }}" maxlength="150" required>
+        <label for="last_name" {% if dades.last_name %}class="active"{% endif %}>Cognom</label>
+      </div>
+
+      <div class="input-field">
+        <input type="text" id="centre-cerca" autocomplete="off" value="{{ dades.centre_nom }}">
+        <input type="hidden" name="centre" id="centre" value="{{ dades.centre }}">
+        <label for="centre-cerca" class="active">Centre educatiu</label>
+      </div>
+      <ul id="centre-resultats" class="collection" style="display: none;"></ul>
+      <p class="grey-text">
+        Cerca el centre pel nom o la població i selecciona'l de la llista.
+      </p>
+
+      <a href="#" id="toggle-nou-centre" class="btn-flat waves-effect">
+        <i class="material-icons left">add</i>Crea un nou centre educatiu
+      </a>
+
+      <div id="nou-centre-panel" class="card" {% if not dades.crea_centre %}style="display: none;"{% endif %}>
+        <div class="card-content">
+          <span class="card-title panel-title">
+            <i class="material-icons">add_business</i>Nou centre educatiu
+          </span>
+          <p class="grey-text">
+            Si el centre no apareix a la cerca, omple aquestes dades i es crearà en guardar el perfil.
+            Els camps marcats amb <strong>*</strong> són obligatoris.
+          </p>
+
+          <div class="input-field">
+            <input type="text" name="nou_centre_nom" id="nou_centre_nom" value="{{ dades.nou_centre.nom }}" maxlength="255">
+            <label for="nou_centre_nom" {% if dades.nou_centre.nom %}class="active"{% endif %}>Nom del centre *</label>
+          </div>
+
+          <div class="input-field">
+            <input type="text" name="nou_centre_direccio" id="nou_centre_direccio" value="{{ dades.nou_centre.direccio }}" maxlength="500">
+            <label for="nou_centre_direccio" {% if dades.nou_centre.direccio %}class="active"{% endif %}>Direcció (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <input type="text" name="nou_centre_poblacio" id="nou_centre_poblacio" value="{{ dades.nou_centre.poblacio }}" maxlength="255">
+            <label for="nou_centre_poblacio" {% if dades.nou_centre.poblacio %}class="active"{% endif %}>Població *</label>
+          </div>
+
+          <div class="input-field">
+            <input type="text" name="nou_centre_cp" id="nou_centre_cp" value="{{ dades.nou_centre.cp }}" maxlength="5" inputmode="numeric">
+            <label for="nou_centre_cp" {% if dades.nou_centre.cp %}class="active"{% endif %}>Codi postal *</label>
+          </div>
+
+          <div class="input-field">
+            <input type="tel" name="nou_centre_telefon" id="nou_centre_telefon" value="{{ dades.nou_centre.telefon }}" maxlength="20">
+            <label for="nou_centre_telefon" {% if dades.nou_centre.telefon %}class="active"{% endif %}>Telèfon (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <input type="text" name="nou_centre_codi" id="nou_centre_codi" value="{{ dades.nou_centre.codi }}" inputmode="numeric">
+            <label for="nou_centre_codi" {% if dades.nou_centre.codi %}class="active"{% endif %}>Codi del centre (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <input type="email" name="nou_centre_email" id="nou_centre_email" value="{{ dades.nou_centre.email }}">
+            <label for="nou_centre_email" {% if dades.nou_centre.email %}class="active"{% endif %}>Correu electrònic *</label>
+          </div>
+
+          <div class="input-field">
+            <input type="url" name="nou_centre_web" id="nou_centre_web" value="{{ dades.nou_centre.web }}">
+            <label for="nou_centre_web" {% if dades.nou_centre.web %}class="active"{% endif %}>Web (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <textarea name="nou_centre_descripcio" id="nou_centre_descripcio" class="materialize-textarea">{{ dades.nou_centre.descripcio }}</textarea>
+            <label for="nou_centre_descripcio" {% if dades.nou_centre.descripcio %}class="active"{% endif %}>Descripció (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <input type="url" name="nou_centre_imatge" id="nou_centre_imatge" value="{{ dades.nou_centre.imatge }}">
+            <label for="nou_centre_imatge" {% if dades.nou_centre.imatge %}class="active"{% endif %}>URL del logotip (opcional)</label>
+          </div>
+
+          <div class="input-field">
+            <input type="text" id="cicle-cerca" autocomplete="off">
+            <label for="cicle-cerca" class="active">Cicles del centre (opcional)</label>
+          </div>
+          <ul id="cicle-resultats" class="collection" style="display: none;"></ul>
+          <p class="grey-text">
+            Cerca els cicles pel nom, el codi o el grau i selecciona'ls de la llista.
+          </p>
+          <div id="cicles-seleccionats" class="cicle-chips">
+            {% for cicle in cicles %}
+              {% if cicle.pk in dades.nou_centre.cicles %}
+                <input type="hidden" name="nou_centre_cicles" value="{{ cicle.pk }}" data-cicle="{{ cicle.pk }}">
+                <div class="chip" data-cicle="{{ cicle.pk }}">
+                  {{ cicle }} ({{ cicle.codi }})
+                  <i class="close material-icons">close</i>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <br>
+      <button class="btn waves-effect waves-light" type="submit">
+        <i class="material-icons left">save</i>Guarda els canvis
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var input = document.getElementById("centre-cerca");
+    if (!input) {
+      return;
+    }
+
+    var hidden = document.getElementById("centre");
+    var resultats = document.getElementById("centre-resultats");
+    var panel = document.getElementById("nou-centre-panel");
+    var toggle = document.getElementById("toggle-nou-centre");
+    var nomNou = document.getElementById("nou_centre_nom");
+    var temporitzador = null;
+    var peticio = 0;
+
+    function netejaResultats() {
+      resultats.innerHTML = "";
+      resultats.style.display = "none";
+    }
+
+    function afegeixItem(text, onClick, classe) {
+      var item = document.createElement("li");
+      item.className = "collection-item" + (classe ? " " + classe : "");
+      item.style.cursor = "pointer";
+      item.textContent = text;
+      item.addEventListener("click", onClick);
+      resultats.appendChild(item);
+    }
+
+    function obreNouCentre(nom) {
+      panel.style.display = "block";
+      if (nom && nomNou && !nomNou.value) {
+        nomNou.value = nom;
+      }
+      if (nomNou) {
+        M.updateTextFields();
+        nomNou.focus();
+      }
+    }
+
+    function mostraResultats(centres, terme) {
+      resultats.innerHTML = "";
+
+      centres.forEach(function (centre) {
+        afegeixItem(centre.label, function () {
+          hidden.value = centre.id;
+          input.value = centre.label;
+          netejaResultats();
+        });
+      });
+
+      afegeixItem("＋ Crea un nou centre educatiu", function () {
+        obreNouCentre(terme);
+        netejaResultats();
+        input.value = "";
+        hidden.value = "";
+      }, "blue-text");
+
+      resultats.style.display = "block";
+    }
+
+    function cerca(terme) {
+      var actual = ++peticio;
+      fetch("{% url 'cerca_centres' %}?q=" + encodeURIComponent(terme))
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (actual !== peticio) {
+            return;
+          }
+          mostraResultats(data.results || [], terme);
+        })
+        .catch(function () {
+          if (actual === peticio) {
+            mostraResultats([], terme);
+          }
+        });
+    }
+
+    if (toggle) {
+      toggle.addEventListener("click", function (event) {
+        event.preventDefault();
+        var visible = panel.style.display !== "none";
+        panel.style.display = visible ? "none" : "block";
+        if (!visible && nomNou) {
+          nomNou.focus();
+        }
+      });
+    }
+
+    input.addEventListener("input", function () {
+      hidden.value = "";
+      var terme = input.value.trim();
+      clearTimeout(temporitzador);
+      if (!terme) {
+        netejaResultats();
+        return;
+      }
+      temporitzador = setTimeout(function () {
+        cerca(terme);
+      }, 250);
+    });
+
+    input.addEventListener("blur", function () {
+      setTimeout(netejaResultats, 150);
+    });
+
+    var cicleInput = document.getElementById("cicle-cerca");
+    var cicleResultats = document.getElementById("cicle-resultats");
+    var ciclesSeleccionats = document.getElementById("cicles-seleccionats");
+    var cicleTemporitzador = null;
+    var ciclePeticio = 0;
+
+    function netejaCicles() {
+      cicleResultats.innerHTML = "";
+      cicleResultats.style.display = "none";
+    }
+
+    function afegeixCicle(cicle) {
+      if (ciclesSeleccionats.querySelector('input[data-cicle="' + cicle.id + '"]')) {
+        return;
+      }
+
+      var camp = document.createElement("input");
+      camp.type = "hidden";
+      camp.name = "nou_centre_cicles";
+      camp.value = cicle.id;
+      camp.dataset.cicle = cicle.id;
+      ciclesSeleccionats.appendChild(camp);
+
+      var chip = document.createElement("div");
+      chip.className = "chip";
+      chip.dataset.cicle = cicle.id;
+      chip.textContent = cicle.label;
+      var icona = document.createElement("i");
+      icona.className = "close material-icons";
+      icona.textContent = "close";
+      chip.appendChild(icona);
+      ciclesSeleccionats.appendChild(chip);
+    }
+
+    function mostraCicles(llista) {
+      cicleResultats.innerHTML = "";
+
+      llista.forEach(function (cicle) {
+        var item = document.createElement("li");
+        item.className = "collection-item";
+        item.style.cursor = "pointer";
+        item.textContent = cicle.label;
+        item.addEventListener("click", function () {
+          afegeixCicle(cicle);
+          cicleInput.value = "";
+          netejaCicles();
+        });
+        cicleResultats.appendChild(item);
+      });
+
+      if (llista.length) {
+        cicleResultats.style.display = "block";
+      }
+    }
+
+    function cercaCicles(terme) {
+      var actual = ++ciclePeticio;
+      fetch("{% url 'cerca_cicles' %}?q=" + encodeURIComponent(terme))
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (actual !== ciclePeticio) {
+            return;
+          }
+          mostraCicles(data.results || []);
+        })
+        .catch(function () {
+          if (actual === ciclePeticio) {
+            mostraCicles([]);
+          }
+        });
+    }
+
+    if (cicleInput) {
+      cicleInput.addEventListener("input", function () {
+        var terme = cicleInput.value.trim();
+        clearTimeout(cicleTemporitzador);
+        if (!terme) {
+          netejaCicles();
+          return;
+        }
+        cicleTemporitzador = setTimeout(function () {
+          cercaCicles(terme);
+        }, 250);
+      });
+
+      cicleInput.addEventListener("blur", function () {
+        setTimeout(netejaCicles, 150);
+      });
+    }
+
+    ciclesSeleccionats.addEventListener("click", function (event) {
+      var icona = event.target.closest(".close");
+      if (!icona) {
+        return;
+      }
+      var chip = icona.closest(".chip");
+      var id = chip.dataset.cicle;
+      var camp = ciclesSeleccionats.querySelector('input[data-cicle="' + id + '"]');
+      if (camp) {
+        camp.remove();
+      }
+      chip.remove();
+    });
+  })();
+</script>
+{% endblock %}

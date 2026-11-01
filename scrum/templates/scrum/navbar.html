@@ -8,17 +8,20 @@
         <li><a href="{% url 'projectes' %}"><i class="material-icons left">remove_red_eye</i>Projectes</a></li>
 
         {% if user.is_authenticated %}
+          <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons left">assignment</i>Els meus projectes</a></li>
+          <li><a href="{% url 'els_meus_equips' %}"><i class="material-icons left">groups</i>Els meus equips</a></li>
           {% if user.is_superuser or user.is_staff %}
             <li><a href="{% url 'qualifica' %}"><i class="material-icons left">task_alt</i>Qualifica</a></li>
             <li><a href="/admin/"><i class="material-icons left">view_list</i>Administració</a></li>
           {% endif %}
+          <li><a href="{% url 'perfil' %}"><i class="material-icons left">account_circle</i>Perfil</a></li>
           <li>
-            <form method="post" action="{% url 'account_logout' %}" style="display:inline">
+            <form id="logout-form-desktop" method="post" action="{% url 'account_logout' %}" hidden>
               {% csrf_token %}
-              <button type="submit" class="white-text" style="background:none;border:0;cursor:pointer;height:64px;padding:0 15px;font-size:0.95rem;">
-                <i class="material-icons left">person</i>{{ user.nom_complert|default:user.email }}
-              </button>
             </form>
+            <a href="#" data-logout-form="logout-form-desktop" title="Tanca la sessió">
+              <i class="material-icons left">logout</i>{{ user.nom_complert|default:user.email }}
+            </a>
           </li>
         {% else %}
           <li><a href="{% url 'account_signup' %}"><i class="material-icons left">person_add</i>Registra't</a></li>
@@ -29,17 +32,20 @@
       <ul id="nav-mobile" class="sidenav">
         <li><a href="{% url 'projectes' %}"><i class="material-icons">remove_red_eye</i>Projectes</a></li>
         {% if user.is_authenticated %}
+          <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons">assignment</i>Els meus projectes</a></li>
+          <li><a href="{% url 'els_meus_equips' %}"><i class="material-icons">groups</i>Els meus equips</a></li>
           {% if user.is_superuser or user.is_staff %}
             <li><a href="{% url 'qualifica' %}"><i class="material-icons">task_alt</i>Qualifica</a></li>
             <li><a href="/admin/"><i class="material-icons">view_list</i>Administració</a></li>
           {% endif %}
+          <li><a href="{% url 'perfil' %}"><i class="material-icons">account_circle</i>Perfil</a></li>
           <li>
-            <form method="post" action="{% url 'account_logout' %}">
+            <form id="logout-form-mobile" method="post" action="{% url 'account_logout' %}" hidden>
               {% csrf_token %}
-              <button type="submit" class="sidenav-close" style="background:none;border:0;cursor:pointer;color:#000;display:block;font-size:14px;font-weight:500;height:48px;line-height:48px;padding:0 32px;width:100%;text-align:left;">
-                <i class="material-icons">open_in_new</i>Surt
-              </button>
             </form>
+            <a href="#" data-logout-form="logout-form-mobile" class="sidenav-close">
+              <i class="material-icons">logout</i>Surt
+            </a>
           </li>
         {% else %}
           <li><a href="{% url 'account_signup' %}"><i class="material-icons">person_add</i>Registra't</a></li>
@@ -49,3 +55,17 @@
     </div>
   </nav>
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-logout-form]").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        var form = document.getElementById(this.dataset.logoutForm);
+        if (form) {
+          form.submit();
+        }
+      });
+    });
+  });
+</script>
