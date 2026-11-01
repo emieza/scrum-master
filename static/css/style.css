@@ -94,3 +94,31 @@ table.striped > tbody > tr > td {
 .ck-editor__editable b {
   font-weight: 700 !important;
 }
+
+
+.spec-descripcio summary {
+  cursor: pointer;
+  color: #039be5;
+}
+.spec-descripcio[open] summary {
+  margin-bottom: 0.5rem;
+}
+
+#specs-llistat table.striped.specs-table > tbody > tr.spec-fila-senar {
+  background-color: rgba(242, 242, 242, 0.5);
+}
+#specs-llistat table.striped.specs-table > tbody > tr.spec-fila-parell {
+  background-color: transparent;
+}
+
+#specs-llistat tr.spec-amb-descripcio > td {
+  padding-bottom: 0;
+}
+#specs-llistat tr.spec-descripcio-fila > td {
+  padding-top: 0;
+}
+#specs-llistat .spec-descripcio summary {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}

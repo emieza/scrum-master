@@ -1,0 +1,41 @@
+{% if specs %}
+  <table class="striped specs-table responsive-table">
+    <thead>
+      <tr>
+        <th>Ordre</th>
+        <th>Nom</th>
+        <th>Mòduls professionals</th>
+        <th>Hores</th>
+        <th>Sprints</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for spec in specs %}
+        <tr class="spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}{% if spec.descripcio %} spec-amb-descripcio{% endif %}">
+          <td>{{ spec.ordre }}</td>
+          <td>{{ spec.nom }}</td>
+          <td>
+            {% for mp in spec.mp.all %}
+              {{ mp }}{% if not forloop.last %}<br>{% endif %}
+            {% empty %}—{% endfor %}
+          </td>
+          <td>{{ spec.hores_estimades }}</td>
+          <td>{{ spec.show_sprints|default:"—" }}</td>
+        </tr>
+        {% if spec.descripcio %}
+          <tr class="spec-descripcio-fila spec-fila-{% if forloop.counter|divisibleby:"2" %}parell{% else %}senar{% endif %}">
+            <td></td>
+            <td colspan="4">
+              <details class="spec-descripcio">
+                <summary>Mostra la descripció</summary>
+                <div class="rich-text">{{ spec.descripcio|safe }}</div>
+              </details>
+            </td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Encara no hi ha cap spec en aquest projecte.</p>
+{% endif %}

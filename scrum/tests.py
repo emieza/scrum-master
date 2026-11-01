@@ -98,6 +98,28 @@ class ScrumTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pantalla d&#x27;inici")
         self.assertContains(response, "Sprint 1")
+        self.assertNotContains(response, "Resta del backlog")
+
+    def test_detall_projecte_mostra_la_resta_del_backlog(self):
+        Spec.objects.create(
+            nom="Spec sense sprint",
+            projecte=self.projecte,
+            ordre=2,
+            hores_estimades=3,
+        )
+        response = self.client.get(reverse("projecte", args=[self.projecte.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Resta del backlog")
+
+        contingut = response.content.decode()
+        index_sprint = contingut.index(
+            'id="sprint-{}"'.format(self.sprint.id)
+        )
+        index_backlog = contingut.index('id="backlog"')
+        index_spec = contingut.index("Spec sense sprint")
+        self.assertLess(index_sprint, index_backlog)
+        self.assertLess(index_backlog, index_spec)
+        self.assertEqual(contingut.count("Pantalla d&#x27;inici"), 1)
 
     def test_hores_sprint(self):
         self.assertEqual(self.sprint.hores, 8)
@@ -641,6 +663,7 @@ class ScrumTests(TestCase):
         )
         self.assertContains(response, "Edita el projecte")
         self.assertContains(response, self.projecte.nom)
+        self.assertContains(response, 'data-ajax-missatge="#ajax-missatge"')
 
         response = self.client.post(
             reverse("edita_projecte", args=[self.projecte.id]),
@@ -671,6 +694,12 @@ class ScrumTests(TestCase):
             response, reverse("crea_sprint", args=[self.projecte.id])
         )
         self.assertContains(response, reverse("edita_sprint", args=[self.sprint.id]))
+        self.assertContains(response, 'id="sprint-missatge-{}"'.format(self.sprint.id))
+        self.assertContains(
+            response,
+            'data-ajax-missatge="#sprint-missatge-{}"'.format(self.sprint.id),
+        )
+        self.assertContains(response, 'id="sprint-missatge-nou"')
         self.assertNotContains(response, "sprint-nou-notes")
         self.assertNotContains(response, "sprint-notes-{}".format(self.sprint.id))
 
@@ -764,17 +793,43 @@ class ScrumTests(TestCase):
             response, reverse("crea_spec", args=[self.projecte.id])
         )
         self.assertContains(response, 'id="spec-nou-nom"')
+        self.assertContains(response, 'id="spec-missatge-nou"')
+        self.assertContains(response, 'data-ajax-missatge="#spec-missatge-nou"')
         self.assertContains(response, 'id="spec-mp-cerca"')
         self.assertContains(response, 'id="spec-sprints-cerca"')
         self.assertContains(response, reverse("cerca_moduls"))
         self.assertContains(response, reverse("cerca_sprints"))
         self.assertContains(
-            response, "<h3>{}</h3>".format(self.projecte.nom), html=True
+            response,
+            '<h3 id="projecte-nom">{}</h3>'.format(self.projecte.nom),
+            html=True,
         )
         contingut = response.content.decode()
         self.assertLess(
             contingut.index("<h4>Sprints</h4>"),
             contingut.index("<h4>Specs</h4>"),
+        )
+
+    def test_edita_projecte_mostra_la_descripcio_de_les_specs_col_lapsada(self):
+        Spec.objects.create(
+            nom="Spec amb descripció",
+            projecte=self.projecte,
+            ordre=2,
+            descripcio="<p>Text desplegable</p>",
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="spec-descripcio"')
+        self.assertContains(response, 'colspan="4"')
+        self.assertContains(response, 'spec-fila-senar')
+        self.assertContains(response, 'spec-descripcio-fila spec-fila-')
+        self.assertContains(response, "Text desplegable")
+        self.assertNotContains(response, "<th>Descripció</th>")
+        self.assertNotContains(
+            response, '<details class="spec-descripcio" open>'
         )
 
     def test_crea_spec_requereix_login(self):
@@ -832,6 +887,126 @@ class ScrumTests(TestCase):
             response, reverse("edita_projecte", args=[self.projecte.id])
         )
         self.assertFalse(Spec.objects.filter(projecte=self.projecte, nom="").exists())
+
+    def test_edita_projecte_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_projecte", args=[self.projecte.id]),
+            {
+                "nom": "Projecte AJAX",
+                "descripcio": "<p>Descripció AJAX</p>",
+                "centre": str(self.centre.pk),
+                "cicle": str(self.cicle.pk),
+                "inici": "2026-03-01",
+                "final": "2026-04-01",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["nom"], "Projecte AJAX")
+        self.assertEqual(data["descripcio"], "<p>Descripció AJAX</p>")
+        self.assertNotIn("redirect", data)
+        self.projecte.refresh_from_db()
+        self.assertEqual(self.projecte.nom, "Projecte AJAX")
+
+    def test_edita_projecte_amb_ajax_retorna_errors(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_projecte", args=[self.projecte.id]),
+            {
+                "nom": "",
+                "descripcio": "",
+                "centre": str(self.centre.pk),
+                "cicle": str(self.cicle.pk),
+                "inici": "2026-03-01",
+                "final": "2026-04-01",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertTrue(
+            any("obligatori" in error for error in data["errors"])
+        )
+
+    def test_crea_sprint_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_sprint", args=[self.projecte.id]),
+            {
+                "nom": "Sprint AJAX",
+                "inici": "2026-01-01",
+                "final": "2026-01-07",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("Sprint AJAX", data["html"])
+        self.assertNotIn("redirect", data)
+        self.assertTrue(
+            Sprint.objects.filter(
+                nom="Sprint AJAX", projecte=self.projecte
+            ).exists()
+        )
+
+    def test_edita_sprint_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_sprint", args=[self.sprint.id]),
+            {
+                "nom": "Sprint AJAX actualitzat",
+                "inici": "2026-02-01",
+                "final": "2026-02-14",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("Sprint AJAX actualitzat", data["html"])
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.nom, "Sprint AJAX actualitzat")
+
+    def test_crea_spec_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {
+                "nom": "Spec AJAX",
+                "descripcio": "Descripció AJAX",
+                "ordre": "2",
+                "hores_estimades": "4.5",
+                "mp": [str(self.mp.id)],
+                "sprints": [str(self.sprint.id)],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("Spec AJAX", data["html"])
+        self.assertEqual(data["ordre_nova_spec"], 3)
+        self.assertNotIn("redirect", data)
+        spec = Spec.objects.get(nom="Spec AJAX")
+        self.assertIn(self.mp, spec.mp.all())
+        self.assertIn(self.sprint, spec.sprints.all())
+
+    def test_crea_spec_amb_ajax_retorna_errors(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_spec", args=[self.projecte.id]),
+            {"nom": "", "ordre": "-1", "hores_estimades": "-2"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertEqual(len(data["errors"]), 3)
 
     def test_elimina_projecte_requereix_login(self):
         response = self.client.post(

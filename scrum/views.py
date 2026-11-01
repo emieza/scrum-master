@@ -10,6 +10,8 @@ from django.core.validators import URLValidator
 from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from odf.opendocument import OpenDocumentSpreadsheet
 from odf.style import Style, TableCellProperties, TextProperties
@@ -115,6 +117,9 @@ def projecte(request, id):
         {
             "projecte": projecte,
             "mps": projecte.mps(),
+            "specs_backlog": projecte.specs.filter(
+                sprints__isnull=True
+            ).order_by("ordre", "id"),
             "toggled_comment": toggled_comment,
             "activa_comentaris": activa_comentaris,
         },
@@ -372,7 +377,12 @@ def els_meus_projectes(request):
     return render(request, "scrum/meus_projectes.html", {"projectes": projectes})
 
 
+def _peticio_ajax(request):
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
 def _projecte_form(request, projecte=None):
+    es_edicio = projecte is not None
     centres = Centre.objects.order_by("nom")
     cicles = Cicle.objects.order_by("nom")
     avui = datetime.date.today()
@@ -454,9 +464,7 @@ def _projecte_form(request, projecte=None):
                     final=final,
                 )
                 projecte.admins.add(request.user)
-                messages.success(
-                    request, "Projecte «{}» creat correctament.".format(projecte.nom)
-                )
+                missatge = "Projecte «{}» creat correctament.".format(projecte.nom)
             else:
                 projecte.nom = dades["nom"]
                 projecte.descripcio = dades["descripcio"]
@@ -465,10 +473,33 @@ def _projecte_form(request, projecte=None):
                 projecte.inici = inici
                 projecte.final = final
                 projecte.save()
-                messages.success(
-                    request, "Projecte «{}» actualitzat correctament.".format(projecte.nom)
+                missatge = "Projecte «{}» actualitzat correctament.".format(
+                    projecte.nom
                 )
+
+            if _peticio_ajax(request):
+                if not es_edicio:
+                    return JsonResponse(
+                        {
+                            "ok": True,
+                            "missatge": missatge,
+                            "redirect": reverse("els_meus_projectes"),
+                        }
+                    )
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "missatge": missatge,
+                        "nom": projecte.nom,
+                        "descripcio": projecte.descripcio,
+                    }
+                )
+
+            messages.success(request, missatge)
             return redirect("els_meus_projectes")
+
+        if _peticio_ajax(request):
+            return JsonResponse({"ok": False, "errors": errors}, status=400)
 
     if projecte:
         specs = projecte.specs.order_by("ordre", "id")
@@ -584,6 +615,8 @@ def crea_spec(request, projecte_id):
             hores = 0
 
         if errors:
+            if _peticio_ajax(request):
+                return JsonResponse({"ok": False, "errors": errors}, status=400)
             for error in errors:
                 messages.error(request, error)
         else:
@@ -601,9 +634,28 @@ def crea_spec(request, projecte_id):
             spec.sprints.set(
                 projecte.sprints.filter(pk__in=request.POST.getlist("sprints"))
             )
-            messages.success(
-                request, "Spec «{}» creada correctament.".format(nom)
-            )
+            missatge = "Spec «{}» creada correctament.".format(nom)
+
+            if _peticio_ajax(request):
+                specs = projecte.specs.order_by("ordre", "id")
+                html = render_to_string(
+                    "scrum/_specs_llistat.html",
+                    {"specs": specs},
+                    request=request,
+                )
+                ordre_nova_spec = max(
+                    (spec.ordre for spec in specs), default=0
+                ) + 1
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "missatge": missatge,
+                        "html": html,
+                        "ordre_nova_spec": ordre_nova_spec,
+                    }
+                )
+
+            messages.success(request, missatge)
     return redirect("edita_projecte", id=projecte.id)
 
 
@@ -613,6 +665,8 @@ def crea_sprint(request, projecte_id):
     if request.method == "POST":
         nom, inici, final, errors = _valida_sprint(request)
         if errors:
+            if _peticio_ajax(request):
+                return JsonResponse({"ok": False, "errors": errors}, status=400)
             for error in errors:
                 messages.error(request, error)
         else:
@@ -622,9 +676,19 @@ def crea_sprint(request, projecte_id):
                 inici=inici,
                 final=final,
             )
-            messages.success(
-                request, "Sprint «{}» creat correctament.".format(nom)
-            )
+            missatge = "Sprint «{}» creat correctament.".format(nom)
+
+            if _peticio_ajax(request):
+                html = render_to_string(
+                    "scrum/_sprint_llistat.html",
+                    {"sprints": projecte.sprints.all()},
+                    request=request,
+                )
+                return JsonResponse(
+                    {"ok": True, "missatge": missatge, "html": html}
+                )
+
+            messages.success(request, missatge)
     return redirect("edita_projecte", id=projecte.id)
 
 
@@ -634,6 +698,8 @@ def edita_sprint(request, id):
     if request.method == "POST":
         nom, inici, final, errors = _valida_sprint(request)
         if errors:
+            if _peticio_ajax(request):
+                return JsonResponse({"ok": False, "errors": errors}, status=400)
             for error in errors:
                 messages.error(request, error)
         else:
@@ -641,9 +707,19 @@ def edita_sprint(request, id):
             sprint.inici = inici
             sprint.final = final
             sprint.save()
-            messages.success(
-                request, "Sprint «{}» actualitzat correctament.".format(nom)
-            )
+            missatge = "Sprint «{}» actualitzat correctament.".format(nom)
+
+            if _peticio_ajax(request):
+                html = render_to_string(
+                    "scrum/_sprint_llistat.html",
+                    {"sprints": sprint.projecte.sprints.all()},
+                    request=request,
+                )
+                return JsonResponse(
+                    {"ok": True, "missatge": missatge, "html": html}
+                )
+
+            messages.success(request, missatge)
     return redirect("edita_projecte", id=sprint.projecte_id)
 
 

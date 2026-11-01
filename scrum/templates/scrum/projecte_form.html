@@ -36,7 +36,7 @@
 <div class="container">
   <div class="section">
     <h2>{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %}</h2>
-    {% if projecte %}<h3>{{ projecte.nom }}</h3>{% endif %}
+    {% if projecte %}<h3 id="projecte-nom">{{ projecte.nom }}</h3>{% endif %}
     <p class="grey-text">
       {% if projecte %}
         Modifica les dades del projecte «{{ projecte.nom }}».
@@ -44,6 +44,8 @@
         Crea un projecte ABP. Tu seràs administrador del projecte.
       {% endif %}
     </p>
+
+    <div id="ajax-missatge" class="card-panel ajax-missatge" style="display: none;"></div>
 
     {% if errors %}
       <div class="card-panel red lighten-4">
@@ -55,7 +57,7 @@
       </div>
     {% endif %}
 
-    <form method="post">
+    <form method="post"{% if projecte %} data-ajax-form data-ajax-projecte data-ajax-missatge="#ajax-missatge"{% endif %}>
       {% csrf_token %}
 
       <div class="input-field">
@@ -110,43 +112,15 @@
         Crea i edita les iteracions d'aquest projecte.
       </p>
 
-      {% for sprint in sprints %}
-        <div class="card">
-          <div class="card-content">
-            <span class="card-title">{{ sprint.nom }}</span>
-            <form method="post" action="{% url 'edita_sprint' sprint.id %}">
-              {% csrf_token %}
-              <div class="row">
-                <div class="input-field col s12 m4">
-                  <input type="text" name="nom" id="sprint-nom-{{ sprint.id }}"
-                         value="{{ sprint.nom }}" maxlength="255" required>
-                  <label for="sprint-nom-{{ sprint.id }}" class="active">Nom del sprint</label>
-                </div>
-                <div class="input-field col s12 m4">
-                  <input type="date" name="inici" id="sprint-inici-{{ sprint.id }}"
-                         value="{{ sprint.inici|date:'Y-m-d' }}" required>
-                  <label for="sprint-inici-{{ sprint.id }}" class="active">Data d'inici</label>
-                </div>
-                <div class="input-field col s12 m4">
-                  <input type="date" name="final" id="sprint-final-{{ sprint.id }}"
-                         value="{{ sprint.final|date:'Y-m-d' }}" required>
-                  <label for="sprint-final-{{ sprint.id }}" class="active">Data final</label>
-                </div>
-              </div>
-              <button class="btn waves-effect waves-light" type="submit">
-                <i class="material-icons left">save</i>Desa el sprint
-              </button>
-            </form>
-          </div>
-        </div>
-      {% empty %}
-        <p>Encara no hi ha cap sprint en aquest projecte.</p>
-      {% endfor %}
+      <div id="sprints-llistat">
+        {% include "scrum/_sprint_llistat.html" %}
+      </div>
 
       <div class="card blue-grey lighten-5">
         <div class="card-content">
+          <div id="sprint-missatge-nou" class="card-panel ajax-missatge" style="display: none;"></div>
           <span class="card-title">Nou sprint</span>
-          <form method="post" action="{% url 'crea_sprint' projecte.id %}">
+          <form method="post" action="{% url 'crea_sprint' projecte.id %}" data-ajax-form data-ajax-desti="#sprints-llistat" data-ajax-missatge="#sprint-missatge-nou">
             {% csrf_token %}
             <div class="row">
               <div class="input-field col s12 m4">
@@ -178,41 +152,15 @@
         Històries o especificacions del producte d'aquest projecte.
       </p>
 
-      {% if specs %}
-        <table class="striped responsive-table">
-          <thead>
-            <tr>
-              <th>Ordre</th>
-              <th>Nom</th>
-              <th>Mòduls professionals</th>
-              <th>Hores</th>
-              <th>Sprints</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for spec in specs %}
-              <tr>
-                <td>{{ spec.ordre }}</td>
-                <td>{{ spec.nom }}</td>
-                <td>
-                  {% for mp in spec.mp.all %}
-                    {{ mp }}{% if not forloop.last %}<br>{% endif %}
-                  {% empty %}—{% endfor %}
-                </td>
-                <td>{{ spec.hores_estimades }}</td>
-                <td>{{ spec.show_sprints|default:"—" }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>Encara no hi ha cap spec en aquest projecte.</p>
-      {% endif %}
+      <div id="specs-llistat">
+        {% include "scrum/_specs_llistat.html" %}
+      </div>
 
       <div class="card blue-grey lighten-5">
         <div class="card-content">
+          <div id="spec-missatge-nou" class="card-panel ajax-missatge" style="display: none;"></div>
           <span class="card-title">Nova spec</span>
-          <form method="post" action="{% url 'crea_spec' projecte.id %}">
+          <form method="post" action="{% url 'crea_spec' projecte.id %}" data-ajax-form data-ajax-desti="#specs-llistat" data-ajax-missatge="#spec-missatge-nou" data-ajax-spec>
             {% csrf_token %}
             <div class="row">
               <div class="input-field col s12 m3">
@@ -534,6 +482,151 @@
       projecte: "{{ projecte.id }}"
     });
     {% endif %}
+  })();
+  (function () {
+    function obteMissatge(form) {
+      var selector = form.getAttribute("data-ajax-missatge");
+      return selector ? document.querySelector(selector) : null;
+    }
+
+    function netejaMissatges() {
+      document.querySelectorAll(".ajax-missatge").forEach(function (element) {
+        element.innerHTML = "";
+        element.style.display = "none";
+      });
+    }
+
+    function mostraMissatge(element, text) {
+      if (!element) {
+        return;
+      }
+      netejaMissatges();
+      element.innerHTML = "";
+      element.textContent = text;
+      element.className = "card-panel green lighten-4";
+      element.style.display = "block";
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function mostraErrors(element, errors) {
+      if (!element) {
+        return;
+      }
+      netejaMissatges();
+      element.innerHTML = "";
+      element.className = "card-panel red lighten-4";
+      var llista = document.createElement("ul");
+      llista.className = "browser-default";
+      (errors || ["No s'ha pogut desar els canvis."]).forEach(function (error) {
+        var item = document.createElement("li");
+        item.textContent = error;
+        llista.appendChild(item);
+      });
+      element.appendChild(llista);
+      element.style.display = "block";
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function netejaFormulariSpec(form, data) {
+      var nom = form.querySelector('[name="nom"]');
+      if (nom) {
+        nom.value = "";
+      }
+      var ordre = form.querySelector('[name="ordre"]');
+      if (ordre && data.ordre_nova_spec) {
+        ordre.value = data.ordre_nova_spec;
+      }
+      var hores = form.querySelector('[name="hores_estimades"]');
+      if (hores) {
+        hores.value = "0";
+      }
+      var editor = window.editors && window.editors["spec_descripcio"];
+      if (editor) {
+        editor.setData("");
+      }
+      form.querySelectorAll(".spec-chip").forEach(function (chip) {
+        chip.remove();
+      });
+      var cercaMp = form.querySelector("#spec-mp-cerca");
+      if (cercaMp) {
+        cercaMp.value = "";
+      }
+      var cercaSprints = form.querySelector("#spec-sprints-cerca");
+      if (cercaSprints) {
+        cercaSprints.value = "";
+      }
+    }
+
+    document.addEventListener("submit", function (event) {
+      var form = event.target.closest("form[data-ajax-form]");
+      if (!form) {
+        return;
+      }
+
+      event.preventDefault();
+      var boto = form.querySelector('button[type="submit"]');
+      if (boto) {
+        boto.disabled = true;
+      }
+
+      fetch(form.action || window.location.href, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { data: data };
+          });
+        })
+        .then(function (resultat) {
+          var data = resultat.data;
+          if (!data.ok) {
+            mostraErrors(obteMissatge(form), data.errors);
+            return;
+          }
+
+          if (data.redirect) {
+            window.location.href = data.redirect;
+            return;
+          }
+
+          if (form.hasAttribute("data-ajax-projecte") && data.nom) {
+            var titol = document.getElementById("projecte-nom");
+            if (titol) {
+              titol.textContent = data.nom;
+            }
+          }
+
+          var desti = form.getAttribute("data-ajax-desti");
+          if (desti && data.html) {
+            var contenidor = document.querySelector(desti);
+            if (contenidor) {
+              contenidor.innerHTML = data.html;
+            }
+          }
+
+          if (form.hasAttribute("data-ajax-spec")) {
+            netejaFormulariSpec(form, data);
+          } else if (!form.hasAttribute("data-ajax-projecte")) {
+            form.reset();
+          }
+
+          mostraMissatge(obteMissatge(form), data.missatge || "Canvis desats.");
+        })
+        .catch(function () {
+          mostraErrors(
+            obteMissatge(form),
+            ["No s'ha pogut desar els canvis. Torna-ho a provar."]
+          );
+        })
+        .finally(function () {
+          if (boto) {
+            boto.disabled = false;
+          }
+        });
+    });
   })();
 </script>
 {% endblock %}
