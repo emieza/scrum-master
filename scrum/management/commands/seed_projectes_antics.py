@@ -1,6 +1,8 @@
 import datetime
 import json
 import re
+import unicodedata
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
@@ -24,6 +26,24 @@ class Command(BaseCommand):
         "sprints, specs, equips i vídeos."
     )
 
+    CICLES_SENSE_MODULS_NOUS = {"ICB0", "ICC0"}
+    CONNECTORS_NOM_MODUL = {
+        "a",
+        "al",
+        "als",
+        "amb",
+        "d",
+        "de",
+        "del",
+        "el",
+        "els",
+        "en",
+        "i",
+        "la",
+        "les",
+        "per",
+    }
+
     @staticmethod
     def _normalitza_codi(codi):
         codi = codi.strip()
@@ -31,6 +51,49 @@ class Command(BaseCommand):
         if match:
             return match.group(1).lower() + str(int(match.group(2)))
         return codi.lower()
+
+    @staticmethod
+    def _normalitza_nom_modul(nom):
+        nom = unicodedata.normalize("NFKD", nom or "")
+        nom = "".join(char for char in nom if not unicodedata.combining(char))
+        nom = nom.casefold().replace("’", " ").replace("'", " ")
+        nom = re.sub(r"[^a-z0-9]+", " ", nom)
+        return re.sub(r"\s+", " ", nom).strip()
+
+    @classmethod
+    def _inicials_modul(cls, nom):
+        paraules = cls._normalitza_nom_modul(nom).split()
+        return "".join(
+            paraula[0]
+            for paraula in paraules
+            if paraula not in cls.CONNECTORS_NOM_MODUL
+        )
+
+    @classmethod
+    def _similitud_noms_modul(cls, nom_a, nom_b):
+        nom_a = cls._normalitza_nom_modul(nom_a)
+        nom_b = cls._normalitza_nom_modul(nom_b)
+        if not nom_a or not nom_b:
+            return 0.0
+        if nom_a == nom_b:
+            return 1.0
+        puntuacio = SequenceMatcher(None, nom_a, nom_b).ratio()
+        inicials_a = cls._inicials_modul(nom_a)
+        if inicials_a and inicials_a == cls._inicials_modul(nom_b):
+            puntuacio = max(puntuacio, 0.9)
+        return puntuacio
+
+    def _modul_existent_per_similitud(self, cicle, nom):
+        millor_modul = None
+        millor_puntuacio = 0.0
+        for modul in cicle.moduls.order_by("pk"):
+            puntuacio = self._similitud_noms_modul(nom, modul.nom)
+            if puntuacio > millor_puntuacio:
+                millor_modul = modul
+                millor_puntuacio = puntuacio
+        if millor_puntuacio >= 0.6:
+            return millor_modul
+        return None
 
     @staticmethod
     def _data(valor):
@@ -92,11 +155,14 @@ class Command(BaseCommand):
                 cicle=cicle, numero=modul["numero"], nom__iexact=modul["nom"]
             ).first()
         if mp is None:
-            mp = ModulProfessional.objects.create(
-                cicle=cicle,
-                numero=modul["numero"],
-                nom=modul["nom"],
-            )
+            if cicle.codi.upper() in self.CICLES_SENSE_MODULS_NOUS:
+                mp = self._modul_existent_per_similitud(cicle, modul["nom"])
+            else:
+                mp = ModulProfessional.objects.create(
+                    cicle=cicle,
+                    numero=modul["numero"],
+                    nom=modul["nom"],
+                )
 
         cache[clau] = mp
         return mp
@@ -203,8 +269,12 @@ class Command(BaseCommand):
                         stats["specs"] += 1
 
                     mps = [
-                        self._resol_modul(cicle, codi, moduls, modul_cache)
-                        for codi in spec_data["mps"]
+                        mp
+                        for mp in (
+                            self._resol_modul(cicle, codi, moduls, modul_cache)
+                            for codi in spec_data["mps"]
+                        )
+                        if mp is not None
                     ]
                     spec.mp.set(mps)
                     spec.sprints.set(

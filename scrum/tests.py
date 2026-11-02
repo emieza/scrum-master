@@ -11,6 +11,7 @@ from odf.opendocument import load
 from odf.table import Table, TableCell, TableRow
 
 from .adapters import SocialAccountAdapter
+from .management.commands.seed_projectes_antics import Command as SeedCommand
 from .models import (
     Categoria,
     Centre,
@@ -1174,6 +1175,84 @@ class ScrumTests(TestCase):
             response,
             reverse("projecte", args=[self.projecte.id]),
         )
+
+    def test_videos_ordenats_per_data_d_inici_del_projecte(self):
+        projecte_antic = Projecte.objects.create(
+            nom="Projecte antic",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today() - datetime.timedelta(days=30),
+            final=datetime.date.today(),
+        )
+        projecte_recent = Projecte.objects.create(
+            nom="Projecte recent",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        Equip.objects.create(
+            nom="Equip del projecte antic",
+            projecte=projecte_antic,
+            link_video="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        )
+        Equip.objects.create(
+            nom="Equip del projecte recent",
+            projecte=projecte_recent,
+            link_video="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        )
+
+        response = self.client.get(reverse("videos"))
+        contingut = response.content.decode()
+        self.assertLess(
+            contingut.index("Equip del projecte recent"),
+            contingut.index("Equip del projecte antic"),
+        )
+
+    def test_seed_icb0_i_icc0_reutilitzen_moduls_existents_per_similitud(self):
+        command = SeedCommand()
+        for codi in ("ICB0", "ICC0"):
+            cicle = Cicle.objects.create(
+                codi=codi,
+                nom="Cicle {}".format(codi),
+                grau="CFGS",
+            )
+            existent = ModulProfessional.objects.create(
+                cicle=cicle,
+                numero=485,
+                nom="Programació",
+            )
+
+            mp = command._get_modul(
+                cicle,
+                {"codi": "MP03", "numero": 3, "nom": "Programació bàsica"},
+                {},
+            )
+
+            self.assertEqual(mp, existent)
+            self.assertEqual(cicle.moduls.count(), 1)
+
+    def test_seed_icb0_i_icc0_no_creen_moduls_sense_correspondencia(self):
+        command = SeedCommand()
+        cicle = Cicle.objects.create(
+            codi="ICB0",
+            nom="Cicle ICB0",
+            grau="CFGS",
+        )
+        ModulProfessional.objects.create(
+            cicle=cicle,
+            numero=485,
+            nom="Programació",
+        )
+
+        mp = command._get_modul(
+            cicle,
+            {"codi": "MPXX", "numero": 99, "nom": "Mòdul sense correspondència"},
+            {},
+        )
+
+        self.assertIsNone(mp)
+        self.assertEqual(cicle.moduls.count(), 1)
 
     def test_navbar_mostra_enllac_a_videos(self):
         response = self.client.get(reverse("home"))

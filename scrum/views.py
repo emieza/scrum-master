@@ -1047,7 +1047,7 @@ def videos(request):
     equips = (
         Equip.objects.exclude(link_video="")
         .select_related("projecte")
-        .order_by("projecte__nom", "nom")
+        .order_by("-projecte__inici", "projecte__nom", "nom")
     )
     return render(request, "scrum/videos.html", {"equips": equips})
 

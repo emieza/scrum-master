@@ -3,13 +3,46 @@
 {% block title %}Vídeos dels projectes Scrum · Scrum Master{% endblock %}
 
 {% block extra_css %}
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
 .video-card {
   display: flex;
   flex-direction: column;
   height: 100%;
+  margin: 0;
 }
 .video-card .card-content {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
+  padding: 1rem;
+}
+.video-card .card-content .card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  max-height: 2.6em;
+  overflow: hidden;
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.video-project {
+  margin: 0 0 0.35rem;
+  overflow-wrap: anywhere;
+}
+.video-date {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+.video-date .material-icons {
+  font-size: 1rem;
 }
 .video-frame {
   position: relative;
@@ -24,8 +57,8 @@
   border: 0;
 }
 .video-placeholder {
-  min-height: 12rem;
-  padding: 1.5rem;
+  aspect-ratio: 16 / 9;
+  padding: 1rem;
   background: #eceff1;
   display: flex;
   flex-direction: column;
@@ -41,15 +74,34 @@
   color: #78909c;
 }
 .video-links {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+.video-links .btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.video-links .btn-small .material-icons {
+  float: none;
+  margin-right: 0.3rem;
+  font-size: 0.95rem;
 }
 .video-url {
   font-size: 0.85rem;
   overflow-wrap: anywhere;
-  margin-top: 0.75rem;
+  margin-top: 0.6rem;
+}
+.video-empty {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 {% endblock %}
 
@@ -62,67 +114,67 @@
       la resta d'enllaços s'obren en una pestanya nova.
     </p>
 
-    <div class="row">
+    <div class="video-grid">
       {% for equip in equips %}
         {% with youtube_id=equip.video_youtube_id %}
-          <div class="col s12 m6 l4">
-            <div class="card video-card">
-              {% if youtube_id %}
-                <div class="video-frame">
-                  <iframe
-                    src="https://www.youtube-nocookie.com/embed/{{ youtube_id }}"
-                    title="Vídeo de {{ equip.nom }}"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerpolicy="strict-origin-when-cross-origin"
-                    loading="lazy"
-                    allowfullscreen></iframe>
-                </div>
-              {% else %}
-                <div class="video-placeholder">
-                  <i class="material-icons">video_library</i>
-                  {% if equip.es_video_youtube %}
-                    <p>No s'ha pogut generar la preview d'aquest vídeo de YouTube.</p>
-                  {% else %}
-                    <p>Aquest vídeo no és de YouTube.</p>
-                    <p class="grey-text">
-                      Es troba a <b>{{ equip.domini_video }}</b>.
-                      Obre l'enllaç per accedir-hi.
-                    </p>
-                  {% endif %}
-                </div>
-              {% endif %}
-
-              <div class="card-content">
-                <span class="card-title">{{ equip.nom }}</span>
-                <p class="grey-text">{{ equip.projecte.nom }}</p>
-                <div class="video-links">
-                  <a class="btn-small waves-effect waves-light"
-                     href="{{ equip.link_video }}"
-                     target="_blank"
-                     rel="noopener noreferrer">
-                    <i class="material-icons left">open_in_new</i>Obrir vídeo
-                  </a>
-                  <a class="btn-small waves-effect waves-light grey"
-                     href="{% url 'projecte' equip.projecte.id %}">
-                    <i class="material-icons left">assignment</i>Veure specs
-                  </a>
-                </div>
-                {% if not youtube_id %}
-                  <p class="video-url">
-                    <a href="{{ equip.link_video }}" target="_blank" rel="noopener noreferrer">
-                      {{ equip.link_video }}
-                    </a>
+          <div class="card video-card">
+            {% if youtube_id %}
+              <div class="video-frame">
+                <iframe
+                  src="https://www.youtube-nocookie.com/embed/{{ youtube_id }}"
+                  title="Vídeo de {{ equip.nom }}"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  loading="lazy"
+                  allowfullscreen></iframe>
+              </div>
+            {% else %}
+              <div class="video-placeholder">
+                <i class="material-icons">video_library</i>
+                {% if equip.es_video_youtube %}
+                  <p>No s'ha pogut generar la preview d'aquest vídeo de YouTube.</p>
+                {% else %}
+                  <p>Aquest vídeo no és de YouTube.</p>
+                  <p class="grey-text">
+                    Es troba a <b>{{ equip.domini_video }}</b>.
+                    Obre l'enllaç per accedir-hi.
                   </p>
                 {% endif %}
               </div>
+            {% endif %}
+
+            <div class="card-content">
+              <span class="card-title" title="{{ equip.nom }}">{{ equip.nom }}</span>
+              <p class="video-project grey-text">{{ equip.projecte.nom }}</p>
+              <p class="video-date grey-text">
+                <i class="material-icons">event</i>
+                Inici: {{ equip.projecte.inici|date:"j \d\e F \d\e Y" }}
+              </p>
+              <div class="video-links">
+                <a class="btn-small waves-effect waves-light"
+                   href="{{ equip.link_video }}"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                  <i class="material-icons left">open_in_new</i>Obrir vídeo
+                </a>
+                <a class="btn-small waves-effect waves-light grey"
+                   href="{% url 'projecte' equip.projecte.id %}">
+                  <i class="material-icons left">assignment</i>Veure specs
+                </a>
+              </div>
+              {% if not youtube_id %}
+                <p class="video-url">
+                  <a href="{{ equip.link_video }}" target="_blank" rel="noopener noreferrer">
+                    {{ equip.link_video }}
+                  </a>
+                </p>
+              {% endif %}
             </div>
           </div>
         {% endwith %}
       {% empty %}
-        <div class="col s12">
-          <div class="card-panel">
-            Encara no hi ha cap equip amb un enllaç de vídeo.
-          </div>
+        <div class="card-panel video-empty">
+          Encara no hi ha cap equip amb un enllaç de vídeo.
         </div>
       {% endfor %}
     </div>
