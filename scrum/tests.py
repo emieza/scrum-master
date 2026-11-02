@@ -253,13 +253,38 @@ class ScrumTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_dialeg_qualificacio_mostra_mps_en_xips_sencers(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "crea_xips_mps")
+        self.assertContains(response, 'xip.className = "chip"')
+        self.assertContains(response, "xip.textContent = mp.nom")
+        self.assertContains(response, 'input.type = "number"')
+        self.assertContains(response, "set_percentatge_done_spec")
+        self.assertNotContains(response, "toggle_done_spec")
+        self.assertNotContains(response, "substring(0, 4)")
+
+    def test_tanca_dialeg_qualificacio_actualitza_la_vista(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "modal.options.onCloseEnd = recarrega_vista")
+        self.assertContains(response, "function recarrega_vista")
+        self.assertContains(response, "desamentsPendents")
+        self.assertContains(response, "window.location.reload()")
+
     def test_targetes_qualificacio_mostren_percentatges_per_mp(self):
         equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
         quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
         done_spec = DoneSpec.objects.create(
-            qualificacio=quali, spec=self.spec, done=True
+            qualificacio=quali, spec=self.spec, percentatge=100
         )
-        self.assertTrue(done_spec.done)
+        self.assertEqual(done_spec.percentatge, 100)
         self.client.login(username="profe@example.cat", password="contrasenya123")
         response = self.client.get(
             reverse("qualifica"), {"projecte_id": self.projecte.id}
@@ -273,10 +298,78 @@ class ScrumTests(TestCase):
         self.assertContains(response, "<td>8,0</td>", count=2)
         self.assertContains(response, "<td>100.0%</td>")
 
+    def test_algorismes_qualificacio_amb_percentatge_parcial(self):
+        equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
+        quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
+        DoneSpec.objects.create(
+            qualificacio=quali, spec=self.spec, percentatge=50
+        )
+        spec2 = Spec.objects.create(
+            nom="Tancament de sessió",
+            projecte=self.projecte,
+            ordre=2,
+            hores_estimades=2,
+        )
+        spec2.mp.add(self.mp)
+        spec2.sprints.add(self.sprint)
+        DoneSpec.objects.create(
+            qualificacio=quali, spec=spec2, percentatge=0
+        )
+
+        self.assertEqual(quali.specs_completades(), "0.5 (25.0%)")
+        self.assertEqual(quali.hores_completades(), "4.0 (40.0%)")
+        dades = {d["nom"]: d for d in quali.percentatges_mps()}
+        self.assertEqual(dades[self.mp.nom]["total"], 10.0)
+        self.assertEqual(dades[self.mp.nom]["done"], 4.0)
+        self.assertEqual(dades[self.mp.nom]["specs_total"], 2)
+        self.assertEqual(dades[self.mp.nom]["specs_done"], 0.5)
+        self.assertEqual(dades[self.mp.nom]["percentatge"], 40.0)
+        self.assertEqual(
+            quali.specs_completades_mps(),
+            "{} : 0.5/2 (25.0%)<br>".format(self.mp.nom),
+        )
+        self.assertEqual(
+            quali.specs_completades_mps_ponderat(),
+            "{} : 40.0%<br>".format(self.mp.nom),
+        )
+
+    def test_api_actualitza_percentatge_done_spec(self):
+        equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
+        quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
+        done_spec = DoneSpec.objects.create(
+            qualificacio=quali, spec=self.spec, percentatge=0
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+
+        response = self.client.post(
+            reverse("set_percentatge_done_spec", args=[done_spec.id]),
+            {"percentatge": "65.5"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["done_spec"]["percentatge"], 65.5)
+        done_spec.refresh_from_db()
+        self.assertEqual(done_spec.percentatge, 65.5)
+
+        response = self.client.get(
+            reverse("get_qualificacio", args=[quali.id])
+        )
+        self.assertEqual(
+            response.json()["qualificacio"]["done_specs"][0]["percentatge"],
+            65.5,
+        )
+
+        response = self.client.post(
+            reverse("set_percentatge_done_spec", args=[done_spec.id]),
+            {"percentatge": "101"},
+        )
+        self.assertEqual(response.status_code, 400)
+        done_spec.refresh_from_db()
+        self.assertEqual(done_spec.percentatge, 65.5)
+
     def test_percentatges_mps_inclou_specs_afegides_despres(self):
         equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
         quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
-        DoneSpec.objects.create(qualificacio=quali, spec=self.spec, done=True)
+        DoneSpec.objects.create(qualificacio=quali, spec=self.spec, percentatge=100)
         mp_pendent = ModulProfessional.objects.create(
             numero=7, nom="Desenvolupament web en entorn servidor", cicle=self.cicle
         )
@@ -295,7 +388,7 @@ class ScrumTests(TestCase):
         equip.membres.add(self.user)
         quali1 = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
         DoneSpec.objects.create(
-            qualificacio=quali1, spec=self.spec, done=True
+            qualificacio=quali1, spec=self.spec, percentatge=100
         )
         sprint2 = Sprint.objects.create(
             nom="Sprint 2",
@@ -313,7 +406,7 @@ class ScrumTests(TestCase):
         spec2.sprints.add(sprint2)
         quali2 = Qualificacio.objects.create(equip=equip, sprint=sprint2)
         DoneSpec.objects.create(
-            qualificacio=quali2, spec=spec2, done=False
+            qualificacio=quali2, spec=spec2, percentatge=0
         )
         mp2 = ModulProfessional.objects.create(
             numero=7,
@@ -329,7 +422,7 @@ class ScrumTests(TestCase):
         spec3.mp.add(mp2)
         spec3.sprints.add(self.sprint)
         DoneSpec.objects.create(
-            qualificacio=quali1, spec=spec3, done=True
+            qualificacio=quali1, spec=spec3, percentatge=100
         )
 
         self.client.login(username="profe@example.cat", password="contrasenya123")
@@ -827,6 +920,12 @@ class ScrumTests(TestCase):
         self.assertContains(
             response, reverse("crea_spec", args=[self.projecte.id])
         )
+        self.assertContains(response, 'class="spec-hores-input"')
+        self.assertContains(
+            response,
+            reverse("actualitza_hores_spec", args=[self.spec.id]),
+        )
+        self.assertContains(response, 'data-original="8"')
         self.assertContains(response, 'id="spec-nou-nom"')
         self.assertContains(response, 'id="spec-missatge-nou"')
         self.assertContains(response, 'data-ajax-missatge="#spec-missatge-nou"')
@@ -1070,6 +1169,62 @@ class ScrumTests(TestCase):
         self.client.login(username="profe@example.cat", password="contrasenya123")
         response = self.client.get(
             reverse("actualitza_spec", args=[self.spec.id])
+        )
+        self.assertEqual(response.status_code, 405)
+
+    def test_actualitza_hores_spec_amb_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_hores_spec", args=[self.spec.id]),
+            {"hores_estimades": "5.5"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["hores_estimades"], 5.5)
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.hores_estimades, 5.5)
+
+    def test_actualitza_hores_spec_valida_les_dades(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        for hores in ("-2", "no-numèric"):
+            response = self.client.post(
+                reverse("actualitza_hores_spec", args=[self.spec.id]),
+                {"hores_estimades": hores},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(response.json()["ok"])
+        self.spec.refresh_from_db()
+        self.assertEqual(self.spec.hores_estimades, 8)
+
+    def test_actualitza_hores_spec_nomes_per_administradors(self):
+        User.objects.create_user(
+            username="altre",
+            email="altre@example.cat",
+            password="contrasenya123",
+        )
+        self.client.login(username="altre@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("actualitza_hores_spec", args=[self.spec.id]),
+            {"hores_estimades": "3"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_actualitza_hores_spec_requereix_login(self):
+        response = self.client.post(
+            reverse("actualitza_hores_spec", args=[self.spec.id]),
+            {"hores_estimades": "3"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_actualitza_hores_spec_requereix_post(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("actualitza_hores_spec", args=[self.spec.id])
         )
         self.assertEqual(response.status_code, 405)
 

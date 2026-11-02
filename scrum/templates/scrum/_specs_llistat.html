@@ -32,7 +32,18 @@
               {{ mp }}{% if not forloop.last %}<br>{% endif %}
             {% empty %}—{% endfor %}
           </td>
-          <td>{{ spec.hores_estimades }}</td>
+          <td>
+            <input type="number"
+                   class="spec-hores-input"
+                   value="{{ spec.hores_estimades|stringformat:'g' }}"
+                   min="0"
+                   step="0.5"
+                   data-original="{{ spec.hores_estimades|stringformat:'g' }}"
+                   data-actualitza-hores-url="{% url 'actualitza_hores_spec' spec.id %}"
+                   aria-label="Hores estimades de {{ spec.nom }}"
+                   title="Edita les hores estimades"
+                   draggable="false">
+          </td>
           <td>{{ spec.show_sprints|default:"—" }}</td>
           <td class="spec-accions">
             <button type="button"

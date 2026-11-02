@@ -251,14 +251,8 @@ class DoneSpecInline(admin.TabularInline):
     extra = 0
     can_delete = False
     ordering = ("spec__ordre", "spec__id")
-    fields = ("spec", "is_done", "hores_estimades", "descripcio", "mps")
-    readonly_fields = ("spec", "is_done", "hores_estimades", "descripcio", "mps")
-
-    def is_done(self, obj):
-        return obj.done
-
-    is_done.boolean = True
-    is_done.short_description = "Feta"
+    fields = ("spec", "percentatge", "hores_estimades", "descripcio", "mps")
+    readonly_fields = ("spec", "hores_estimades", "descripcio", "mps")
 
     def hores_estimades(self, obj):
         return obj.spec.hores_estimades

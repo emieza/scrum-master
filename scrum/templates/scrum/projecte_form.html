@@ -32,6 +32,23 @@
   margin-left: 0.35rem;
   font-weight: bold;
 }
+.spec-hores-input {
+  width: 6rem;
+  height: 2.2rem;
+  margin: 0;
+  padding: 0 0.5rem;
+  border: 1px solid #9e9e9e;
+  border-radius: 4px;
+  box-sizing: border-box;
+  text-align: right;
+}
+.spec-hores-input:focus {
+  border-bottom: 1px solid #26a69a;
+  box-shadow: 0 1px 0 0 #26a69a;
+}
+.spec-hores-input:disabled {
+  opacity: 0.6;
+}
 {% endblock %}
 
 {% block content %}
@@ -911,6 +928,10 @@
     }
 
     contenidor.addEventListener("dragstart", function (event) {
+      if (event.target.closest(".spec-hores-input")) {
+        event.preventDefault();
+        return;
+      }
       var fila = event.target.closest("tr[data-spec-id]");
       if (!fila || desant) {
         event.preventDefault();
@@ -1163,6 +1184,119 @@
 
     document.addEventListener("spec-abans-reemplacar-llistat", tanca);
     document.addEventListener("spec-tanca-editor", tanca);
+  })();
+  (function () {
+    var contenidor = document.getElementById("specs-llistat");
+    if (!contenidor) {
+      return;
+    }
+
+    function mostraMissatge(text, error) {
+      if (window.M && M.toast) {
+        M.toast({
+          html: text,
+          classes: error ? "red" : "green"
+        });
+        return;
+      }
+      if (error) {
+        alert(text);
+      }
+    }
+
+    function desa(input) {
+      if (input.disabled) {
+        return;
+      }
+      var original = input.getAttribute("data-original");
+      var valor = parseFloat(input.value);
+      if (isNaN(valor) || valor < 0) {
+        input.value = original;
+        mostraMissatge(
+          "Les hores estimades han de ser un nombre positiu.",
+          true
+        );
+        return;
+      }
+      if (valor === parseFloat(original)) {
+        input.value = original;
+        return;
+      }
+
+      var dades = new FormData();
+      dades.append("hores_estimades", valor);
+      var csrf = document.querySelector("[name=csrfmiddlewaretoken]");
+      input.disabled = true;
+
+      fetch(input.getAttribute("data-actualitza-hores-url"), {
+        method: "POST",
+        body: dades,
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": csrf ? csrf.value : ""
+        },
+        credentials: "same-origin"
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data };
+          });
+        })
+        .then(function (resultat) {
+          var data = resultat.data;
+          if (!resultat.ok || !data.ok) {
+            input.value = original;
+            mostraMissatge(
+              (data.errors || ["No s'han pogut desar les hores."]).join(" "),
+              true
+            );
+            return;
+          }
+
+          input.value = data.hores_estimades;
+          input.setAttribute("data-original", String(data.hores_estimades));
+          var fila = input.closest("tr[data-spec-id]");
+          if (fila) {
+            fila.setAttribute("data-spec-hores", String(data.hores_estimades));
+          }
+          mostraMissatge(
+            data.missatge || "Hores estimades desades correctament.",
+            false
+          );
+        })
+        .catch(function () {
+          input.value = original;
+          mostraMissatge(
+            "No s'han pogut desar les hores. Torna-ho a provar.",
+            true
+          );
+        })
+        .finally(function () {
+          input.disabled = false;
+        });
+    }
+
+    contenidor.addEventListener("change", function (event) {
+      var input = event.target.closest(".spec-hores-input");
+      if (!input || !contenidor.contains(input)) {
+        return;
+      }
+      desa(input);
+    });
+
+    contenidor.addEventListener("keydown", function (event) {
+      var input = event.target.closest(".spec-hores-input");
+      if (!input || !contenidor.contains(input)) {
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      } else if (event.key === "Escape") {
+        input.value = input.getAttribute("data-original");
+        input.blur();
+      }
+    });
   })();
 </script>
 {% endblock %}

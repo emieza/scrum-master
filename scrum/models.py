@@ -1,6 +1,7 @@
 import datetime
 
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.safestring import mark_safe
@@ -315,25 +316,28 @@ class Qualificacio(models.Model):
 
     def specs_completades(self):
         total = 0
-        done = 0
+        completades = 0.0
         for dspec in self.done_specs.all():
             total += 1
-            if dspec.done:
-                done += 1
+            completades += dspec.fraccio
         if total == 0:
             return "-"
-        return "{} ({:.1f}%)".format(done, round(100 * done / total, 1))
+        return "{:.1f} ({:.1f}%)".format(
+            completades, round(100 * completades / total, 1)
+        )
 
     def hores_completades(self):
         total = 0
-        done = 0
+        completades = 0.0
         for dspec in self.done_specs.all():
-            total += dspec.spec.hores_estimades or 0
-            if dspec.done:
-                done += dspec.spec.hores_estimades or 0
+            hores = dspec.spec.hores_estimades or 0
+            total += hores
+            completades += hores * dspec.fraccio
         if total == 0:
             return "-"
-        return "{} ({:.1f}%)".format(done, round(100 * done / total, 1))
+        return "{:.1f} ({:.1f}%)".format(
+            completades, round(100 * completades / total, 1)
+        )
 
     def _dades_mps_sprint(self):
         """Agrupa les specs del sprint per mòdul professional.
@@ -342,12 +346,13 @@ class Qualificacio(models.Model):
         qualificació no tingui encara un DoneSpec per a elles (per exemple,
         si la spec s'ha afegit després de crear la qualificació).
         """
-        done_by_spec = {
-            dspec.spec_id: dspec.done for dspec in self.done_specs.all()
+        completacio_by_spec = {
+            dspec.spec_id: dspec.fraccio for dspec in self.done_specs.all()
         }
         mps = {}
         for spec in self.sprint.specs.all():
             hores = spec.hores_estimades or 0
+            fraccio = completacio_by_spec.get(spec.id, 0)
             for mp in spec.mp.all():
                 if mp.id not in mps:
                     mps[mp.id] = {
@@ -358,10 +363,9 @@ class Qualificacio(models.Model):
                         "specs_done": 0,
                     }
                 mps[mp.id]["total"] += hores
+                mps[mp.id]["done"] += hores * fraccio
                 mps[mp.id]["specs_total"] += 1
-                if done_by_spec.get(spec.id):
-                    mps[mp.id]["done"] += hores
-                    mps[mp.id]["specs_done"] += 1
+                mps[mp.id]["specs_done"] += fraccio
         return mps
 
     def percentatges_mps(self):
@@ -382,9 +386,9 @@ class Qualificacio(models.Model):
                     "mp": dades["obj"],
                     "nom": dades["obj"].nom,
                     "total": dades["total"],
-                    "done": dades["done"],
+                    "done": round(dades["done"], 2),
                     "specs_total": dades["specs_total"],
-                    "specs_done": dades["specs_done"],
+                    "specs_done": round(dades["specs_done"], 2),
                     "percentatge": round(percentatge, 1),
                     "percentatge_text": "{:.1f}".format(percentatge),
                 }
@@ -395,7 +399,7 @@ class Qualificacio(models.Model):
         ret = ""
         for dades in self.percentatges_mps():
             if dades["specs_total"]:
-                ret += "{} : {}/{} ({:.1f}%)<br>".format(
+                ret += "{} : {:.1f}/{:.0f} ({:.1f}%)<br>".format(
                     dades["nom"],
                     dades["specs_done"],
                     dades["specs_total"],
@@ -418,7 +422,7 @@ class Qualificacio(models.Model):
 
 
 class DoneSpec(models.Model):
-    """Estat de completat d'una spec dins d'una qualificació."""
+    """Percentatge de compleció d'una spec dins d'una qualificació."""
 
     class Meta:
         verbose_name = "spec completada"
@@ -435,14 +439,24 @@ class DoneSpec(models.Model):
         Qualificacio, on_delete=models.CASCADE, related_name="done_specs"
     )
     spec = models.ForeignKey(Spec, on_delete=models.CASCADE, related_name="done_specs")
-    done = models.BooleanField(default=False)
+    percentatge = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name="percentatge de compleció",
+    )
 
     def __str__(self):
-        return "{} : {}".format(self.spec.ordre, self.spec.nom)
+        return "{} : {} ({:.1f}%)".format(
+            self.spec.ordre, self.spec.nom, self.percentatge
+        )
 
     @property
     def ordre(self):
         return self.spec.ordre
+
+    @property
+    def fraccio(self):
+        return min(max(self.percentatge or 0, 0), 100) / 100
 
 
 class SpecFeedback(models.Model):

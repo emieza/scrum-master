@@ -713,6 +713,36 @@ def actualitza_spec(request, id):
 
 @login_required
 @require_POST
+def actualitza_hores_spec(request, id):
+    spec = get_object_or_404(Spec, pk=id, projecte__admins=request.user)
+    try:
+        hores = float(request.POST.get("hores_estimades", ""))
+    except (TypeError, ValueError):
+        hores = None
+    if hores is None or not (0 <= hores < float("inf")):
+        return JsonResponse(
+            {
+                "ok": False,
+                "errors": [
+                    "Les hores estimades han de ser un nombre positiu."
+                ],
+            },
+            status=400,
+        )
+
+    spec.hores_estimades = hores
+    spec.save(update_fields=["hores_estimades"])
+    return JsonResponse(
+        {
+            "ok": True,
+            "missatge": "Hores estimades actualitzades correctament.",
+            "hores_estimades": hores,
+        }
+    )
+
+
+@login_required
+@require_POST
 def reordena_specs(request, projecte_id):
     projecte = get_object_or_404(Projecte, pk=projecte_id, admins=request.user)
     ids = request.POST.getlist("ids")
@@ -1125,7 +1155,7 @@ def _spec_data(spec):
 def _done_spec_data(done_spec):
     return {
         "id": done_spec.id,
-        "done": done_spec.done,
+        "percentatge": done_spec.percentatge,
         "ordre": done_spec.ordre,
         "spec": _spec_data(done_spec.spec),
     }
@@ -1222,14 +1252,25 @@ def get_qualificacio(request, qualificacio_id):
 
 @login_required
 @require_POST
-def toggle_done_spec(request, done_spec_id):
+def set_percentatge_done_spec(request, done_spec_id):
     done_spec = get_object_or_404(DoneSpec, pk=done_spec_id)
     if not _pot_gestionar(request.user, done_spec.spec.projecte):
         return JsonResponse(
             {"status": "ERROR", "message": "Falten permisos."}, status=403
         )
-    done_spec.done = not done_spec.done
-    done_spec.save(update_fields=["done"])
+    try:
+        percentatge = float(request.POST.get("percentatge", ""))
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"status": "ERROR", "message": "Percentatge no vàlid."}, status=400
+        )
+    if not 0 <= percentatge <= 100:
+        return JsonResponse(
+            {"status": "ERROR", "message": "El percentatge ha d'estar entre 0 i 100."},
+            status=400,
+        )
+    done_spec.percentatge = percentatge
+    done_spec.save(update_fields=["percentatge"])
     return JsonResponse({"status": "OK", "done_spec": _done_spec_data(done_spec)})
 
 

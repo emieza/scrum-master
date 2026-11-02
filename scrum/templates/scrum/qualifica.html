@@ -2,6 +2,56 @@
 
 {% block title %}{% if projecte_fixat %}Qualifica {{ projecte.nom }}{% else %}Qualifica projectes{% endif %} · Scrum Master{% endblock %}
 
+{% block extra_css %}
+#modal-specs .spec-mps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+#modal-specs .spec-mps .chip {
+  height: auto;
+  min-height: 1.8rem;
+  line-height: 1.3;
+  padding: 0.25rem 0.75rem;
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+#modal-specs .spec-fila {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+#modal-specs .spec-info {
+  flex: 1 1 60%;
+}
+#modal-specs .spec-percentatge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  color: #616161;
+  white-space: nowrap;
+}
+#modal-specs .spec-percentatge input {
+  width: 5rem;
+  height: 2.2rem;
+  margin: 0;
+  padding: 0 0.5rem;
+  border: 1px solid #9e9e9e;
+  border-radius: 4px;
+  text-align: right;
+}
+#modal-specs .spec-percentatge input:focus {
+  border-bottom: 1px solid #26a69a;
+  box-shadow: 0 1px 0 0 #26a69a;
+}
+{% endblock %}
+
 {% block content %}
 <div class="container">
   <div class="section">
@@ -80,7 +130,7 @@
                         <tr>
                           <td>{{ dada.obj }}</td>
                           <td>{{ dada.total }}</td>
-                          <td>{{ dada.done }}</td>
+                          <td>{{ dada.done|floatformat:1 }}</td>
                           <td>{{ dada.percentatge_text }}%</td>
                         </tr>
                       {% empty %}
@@ -130,6 +180,29 @@
 {% block extra_js %}
 <script>
   var currentQualificacioId = null;
+  var desamentsPendents = 0;
+  var recarregant = false;
+
+  function marca_desament(promesa) {
+    desamentsPendents += 1;
+    promesa.finally(function () {
+      desamentsPendents -= 1;
+    });
+    return promesa;
+  }
+
+  function recarrega_vista() {
+    if (recarregant) return;
+    recarregant = true;
+    var inici = Date.now();
+    (function espera() {
+      if (desamentsPendents > 0 && Date.now() - inici < 5000) {
+        setTimeout(espera, 50);
+        return;
+      }
+      window.location.reload();
+    })();
+  }
 
   function getCookie(name) {
     var value = "; " + document.cookie;
@@ -184,6 +257,18 @@
       });
   }
 
+  function crea_xips_mps(mps) {
+    var contenidor = document.createElement("span");
+    contenidor.className = "spec-mps";
+    (mps || []).forEach(function (mp) {
+      var xip = document.createElement("span");
+      xip.className = "chip";
+      xip.textContent = mp.nom;
+      contenidor.appendChild(xip);
+    });
+    return contenidor;
+  }
+
   function edita_qualificacio(qualiId) {
     fetch("/scrum/api/get_qualificacio/" + qualiId)
       .then(function (response) { return response.json(); })
@@ -205,19 +290,42 @@
         var list = document.getElementById("modal-specs");
         list.innerHTML = "";
         quali.done_specs.forEach(function (ds) {
-          var mps = ds.spec.mp.map(function (mp) {
-            return mp.nom.substring(0, 4);
-          }).join(" ");
-
           var li = document.createElement("li");
           li.className = "collection-item";
-          li.innerHTML =
-            '<label>' +
-              '<input type="checkbox" class="filled-in" ' + (ds.done ? "checked" : "") +
-              ' onchange="toggle_done_spec(' + ds.id + ')" />' +
-              '<span>' + ds.spec.ordre + '. ' + ds.spec.nom +
-              ' <span class="teal-text">[' + ds.spec.hores_estimades + ' h] ' + mps + '</span></span>' +
-            '</label>';
+
+          var fila = document.createElement("div");
+          fila.className = "spec-fila";
+
+          var text = document.createElement("span");
+          text.className = "spec-info";
+          text.appendChild(
+            document.createTextNode(ds.spec.ordre + ". " + ds.spec.nom + " ")
+          );
+          var hores = document.createElement("span");
+          hores.className = "teal-text";
+          hores.textContent = "[" + ds.spec.hores_estimades + " h]";
+          text.appendChild(hores);
+          text.appendChild(crea_xips_mps(ds.spec.mp));
+
+          var percentatge = document.createElement("label");
+          percentatge.className = "spec-percentatge";
+          var input = document.createElement("input");
+          input.type = "number";
+          input.min = "0";
+          input.max = "100";
+          input.step = "1";
+          input.value = ds.percentatge;
+          input.addEventListener("change", function () {
+            actualitza_percentatge_spec(ds.id, input);
+          });
+          var sufix = document.createElement("span");
+          sufix.textContent = "%";
+          percentatge.appendChild(input);
+          percentatge.appendChild(sufix);
+
+          fila.appendChild(text);
+          fila.appendChild(percentatge);
+          li.appendChild(fila);
           list.appendChild(li);
         });
 
@@ -225,6 +333,7 @@
         M.textareaAutoResize(document.getElementById("comentaris"));
 
         var modal = M.Modal.getInstance(document.getElementById("modal1"));
+        modal.options.onCloseEnd = recarrega_vista;
         modal.open();
       })
       .catch(function () {
@@ -232,12 +341,20 @@
       });
   }
 
-  function toggle_done_spec(doneSpecId) {
-    post("/scrum/api/toggle_done_spec/" + doneSpecId)
+  function actualitza_percentatge_spec(doneSpecId, input) {
+    var percentatge = parseFloat(input.value);
+    if (isNaN(percentatge)) percentatge = 0;
+    percentatge = Math.max(0, Math.min(100, percentatge));
+    input.value = percentatge;
+    return marca_desament(post("/scrum/api/set_percentatge_done_spec/" + doneSpecId, {
+      percentatge: percentatge
+    }))
       .then(function (resp) {
         if (resp.status !== "OK") {
-          alert("ERROR al modificar l'estat de la spec.");
+          alert("ERROR al modificar el percentatge de la spec.");
+          return;
         }
+        input.value = resp.done_spec.percentatge;
       })
       .catch(function () {
         alert("ERROR en l'actualització de la spec.");
@@ -246,9 +363,9 @@
 
   function guarda_comentari() {
     if (!currentQualificacioId) return;
-    post("/scrum/api/set_comment_to_qualificacio/" + currentQualificacioId, {
+    return marca_desament(post("/scrum/api/set_comment_to_qualificacio/" + currentQualificacioId, {
       comentaris: document.getElementById("comentaris").value
-    })
+    }))
       .then(function (resp) {
         if (resp.status !== "OK") {
           alert("ERROR al guardar el comentari.");

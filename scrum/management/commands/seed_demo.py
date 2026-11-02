@@ -222,7 +222,9 @@ class Command(BaseCommand):
         )
         for spec in sprint1.specs.all():
             DoneSpec.objects.get_or_create(
-                qualificacio=qualificacio, spec=spec, defaults={"done": True}
+                qualificacio=qualificacio,
+                spec=spec,
+                defaults={"percentatge": 100.0},
             )
 
         SpecFeedback.objects.get_or_create(

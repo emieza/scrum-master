@@ -54,6 +54,11 @@ urlpatterns = [
         name="actualitza_spec",
     ),
     path(
+        "scrum/specs/<int:id>/hores",
+        views.actualitza_hores_spec,
+        name="actualitza_hores_spec",
+    ),
+    path(
         "scrum/els-meus-projectes/<int:projecte_id>/sprints/nou",
         views.crea_sprint,
         name="crea_sprint",
@@ -93,9 +98,9 @@ urlpatterns = [
         name="get_qualificacio",
     ),
     path(
-        "scrum/api/toggle_done_spec/<int:done_spec_id>",
-        views.toggle_done_spec,
-        name="toggle_done_spec",
+        "scrum/api/set_percentatge_done_spec/<int:done_spec_id>",
+        views.set_percentatge_done_spec,
+        name="set_percentatge_done_spec",
     ),
     path(
         "scrum/api/set_comment_to_qualificacio/<int:qualificacio_id>",
