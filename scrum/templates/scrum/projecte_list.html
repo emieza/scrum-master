@@ -2,19 +2,72 @@
 
 {% block title %}Projectes Scrum · Scrum Master{% endblock %}
 
+{% block extra_css %}
+#projectes-taula .accions {
+  min-width: 7rem;
+}
+#projectes-taula .accions .btn {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+#projectes-taula .accions .btn .material-icons {
+  float: none;
+  margin-right: 0.35rem;
+  font-size: 1.1rem;
+}
+#modal-clonar .modal-content {
+  padding-bottom: 0.5rem;
+}
+#clonar-error ul {
+  margin: 0;
+}
+#filtre-projectes .input-field {
+  margin-top: 0.5rem;
+}
+#filtre-projectes .accions-filtre {
+  margin-bottom: 1rem;
+}
+{% endblock %}
+
 {% block content %}
 <div class="container">
   <div class="section">
     <h2>Projectes Scrum</h2>
     <p class="grey-text">Projectes ABP gestionats amb metodologia Scrum educatiu.</p>
 
-    <table class="striped responsive-table">
+    <form method="get" id="filtre-projectes" class="row">
+      <div class="input-field col s12 m4">
+        <input type="text" name="nom" id="filtre-nom" value="{{ filtres.nom }}" autocomplete="off">
+        <label for="filtre-nom" {% if filtres.nom %}class="active"{% endif %}>Nom del projecte</label>
+      </div>
+      <div class="input-field col s12 m4">
+        <input type="text" name="centre" id="filtre-centre" value="{{ filtres.centre }}" autocomplete="off">
+        <label for="filtre-centre" {% if filtres.centre %}class="active"{% endif %}>Centre educatiu</label>
+      </div>
+      <div class="input-field col s12 m4">
+        <input type="text" name="cicle" id="filtre-cicle" value="{{ filtres.cicle }}" autocomplete="off">
+        <label for="filtre-cicle" {% if filtres.cicle %}class="active"{% endif %}>Nom del cicle</label>
+      </div>
+      <div class="col s12 accions-filtre">
+        <button class="btn waves-effect waves-light" type="submit">
+          <i class="material-icons left">search</i>Filtra
+        </button>
+        {% if filtres.actiu %}
+          <a class="btn-flat waves-effect" href="{% url 'projectes' %}">
+            <i class="material-icons left">clear</i>Neteja els filtres
+          </a>
+        {% endif %}
+      </div>
+    </form>
+
+    <table id="projectes-taula" class="striped responsive-table">
       <thead>
         <tr>
           <th>Nom projecte</th>
           <th>Cicle i centre</th>
           <th>Dates inici - final</th>
-          <th>Go!</th>
+          <th>Accions</th>
         </tr>
       </thead>
       <tbody>
@@ -33,19 +86,143 @@
                 Final: {{ projecte.final|date:"j \d\e F \d\e Y" }}
               </span>
             </td>
-            <td>
-              <a class="secondary-content" href="{% url 'projecte' projecte.id %}">
-                <i class="material-icons">send</i>
-              </a>
+            <td class="accions">
+              {% if user.is_authenticated %}
+                <a class="btn btn-small waves-effect waves-light modal-trigger"
+                   href="#modal-clonar"
+                   data-clonar-projecte
+                   data-projecte-nom="{{ projecte.nom }}"
+                   data-nom-clon="{{ projecte.nom_clon }}"
+                   data-clonar-url="{% url 'clona_projecte' projecte.id %}">
+                  <i class="material-icons left">content_copy</i>Clonar
+                </a>
+              {% else %}
+                <span class="grey-text">—</span>
+              {% endif %}
             </td>
           </tr>
         {% empty %}
           <tr>
-            <td colspan="4">Encara no hi ha projectes. Crea'n un des de l'administració.</td>
+            <td colspan="4">
+              {% if filtres.actiu %}
+                No hi ha cap projecte que coincideixi amb els filtres.
+              {% else %}
+                Encara no hi ha projectes. Crea'n un des de l'administració.
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+{% if user.is_authenticated %}
+  <div id="modal-clonar" class="modal">
+    <form id="form-clonar" method="post" action="">
+      {% csrf_token %}
+      <div class="modal-content">
+        <h4>Clonar projecte</h4>
+        <p>
+          Es crearà una còpia de «<span id="clonar-projecte-nom"></span>»
+          amb els mateixos paràmetres, sprints i specs. Els sprints començaran
+          a partir d'avui i conservaran la seva durada original.
+        </p>
+        <div class="input-field">
+          <input type="text" name="nom" id="clonar-nom" maxlength="255" required>
+          <label for="clonar-nom" class="active">Nom del nou projecte</label>
+        </div>
+        <p>
+          <label>
+            <input type="checkbox" name="reseteja_hores_estimades" id="clonar-reseteja-hores" checked>
+            <span>Reseteja les hores estimades de les specs a zero</span>
+          </label>
+        </p>
+        <div id="clonar-error" class="card-panel red lighten-4" style="display: none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-close btn-flat waves-effect">Cancel·la</button>
+        <button type="submit" class="btn waves-effect waves-light" id="clonar-submit">
+          <i class="material-icons left">content_copy</i>Clona
+        </button>
+      </div>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if user.is_authenticated %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var modalElement = document.getElementById("modal-clonar");
+    var form = document.getElementById("form-clonar");
+    var input = document.getElementById("clonar-nom");
+    var resetejaHores = document.getElementById("clonar-reseteja-hores");
+    var nomProjecte = document.getElementById("clonar-projecte-nom");
+    var errorBox = document.getElementById("clonar-error");
+    var submit = document.getElementById("clonar-submit");
+    if (!modalElement || !form || !input) {
+      return;
+    }
+
+    M.Modal.getInstance(modalElement) || M.Modal.init(modalElement);
+
+    document.querySelectorAll("[data-clonar-projecte]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        form.action = button.dataset.clonarUrl;
+        input.value = button.dataset.nomClon;
+        if (resetejaHores) {
+          resetejaHores.checked = true;
+        }
+        nomProjecte.textContent = button.dataset.projecteNom;
+        errorBox.style.display = "none";
+        errorBox.textContent = "";
+      });
+    });
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+      submit.disabled = true;
+
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: {"X-Requested-With": "XMLHttpRequest"}
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return {ok: response.ok, data: data};
+          });
+        })
+        .then(function (result) {
+          if (!result.ok || !result.data.ok) {
+            var errors = result.data.errors || ["No s'ha pogut clonar el projecte."];
+            var llista = document.createElement("ul");
+            llista.className = "browser-default";
+            errors.forEach(function (error) {
+              var item = document.createElement("li");
+              item.textContent = error;
+              llista.appendChild(item);
+            });
+            errorBox.textContent = "";
+            errorBox.appendChild(llista);
+            errorBox.style.display = "block";
+            return;
+          }
+          window.location.href = result.data.redirect;
+        })
+        .catch(function () {
+          errorBox.textContent = "No s'ha pogut clonar el projecte. Torna-ho a provar.";
+          errorBox.style.display = "block";
+        })
+        .finally(function () {
+          submit.disabled = false;
+        });
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

@@ -219,7 +219,7 @@ class SpecAdmin(admin.ModelAdmin):
 
 class EquipAdmin(admin.ModelAdmin):
     model = Equip
-    list_display = ("nom", "projecte", "show_membres")
+    list_display = ("nom", "projecte", "link_video", "show_membres")
     list_filter = ("projecte",)
     search_fields = ("nom", "projecte__nom", "membres__email")
     filter_horizontal = ("membres",)
@@ -251,7 +251,14 @@ class DoneSpecInline(admin.TabularInline):
     extra = 0
     can_delete = False
     ordering = ("spec__ordre", "spec__id")
-    fields = ("spec", "percentatge", "hores_estimades", "descripcio", "mps")
+    fields = (
+        "spec",
+        "percentatge",
+        "qualificacio_individual",
+        "hores_estimades",
+        "descripcio",
+        "mps",
+    )
     readonly_fields = ("spec", "hores_estimades", "descripcio", "mps")
 
     def hores_estimades(self, obj):

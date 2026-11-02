@@ -6,6 +6,7 @@
 
       <ul class="right hide-on-med-and-down">
         <li><a href="{% url 'projectes' %}"><i class="material-icons left">remove_red_eye</i>Projectes</a></li>
+        <li><a href="{% url 'videos' %}"><i class="material-icons left">ondemand_video</i>Vídeos</a></li>
 
         {% if user.is_authenticated %}
           <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons left">assignment</i>Els meus projectes</a></li>
@@ -31,6 +32,7 @@
 
       <ul id="nav-mobile" class="sidenav">
         <li><a href="{% url 'projectes' %}"><i class="material-icons">remove_red_eye</i>Projectes</a></li>
+        <li><a href="{% url 'videos' %}"><i class="material-icons">ondemand_video</i>Vídeos</a></li>
         {% if user.is_authenticated %}
           <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons">assignment</i>Els meus projectes</a></li>
           <li><a href="{% url 'els_meus_equips' %}"><i class="material-icons">groups</i>Els meus equips</a></li>

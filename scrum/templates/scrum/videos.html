@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Vídeos dels projectes Scrum · Scrum Master{% endblock %}
+
+{% block extra_css %}
+.video-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.video-card .card-content {
+  flex: 1 1 auto;
+}
+.video-frame {
+  position: relative;
+  padding-top: 56.25%;
+  background: #000;
+}
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.video-placeholder {
+  min-height: 12rem;
+  padding: 1.5rem;
+  background: #eceff1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.video-placeholder p {
+  margin: 0.35rem 0;
+}
+.video-placeholder .material-icons {
+  font-size: 3rem;
+  color: #78909c;
+}
+.video-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.video-url {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  margin-top: 0.75rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Vídeos dels projectes Scrum</h2>
+    <p class="grey-text">
+      Presentacions dels equips. Els vídeos de YouTube es poden veure aquí mateix;
+      la resta d'enllaços s'obren en una pestanya nova.
+    </p>
+
+    <div class="row">
+      {% for equip in equips %}
+        {% with youtube_id=equip.video_youtube_id %}
+          <div class="col s12 m6 l4">
+            <div class="card video-card">
+              {% if youtube_id %}
+                <div class="video-frame">
+                  <iframe
+                    src="https://www.youtube-nocookie.com/embed/{{ youtube_id }}"
+                    title="Vídeo de {{ equip.nom }}"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    loading="lazy"
+                    allowfullscreen></iframe>
+                </div>
+              {% else %}
+                <div class="video-placeholder">
+                  <i class="material-icons">video_library</i>
+                  {% if equip.es_video_youtube %}
+                    <p>No s'ha pogut generar la preview d'aquest vídeo de YouTube.</p>
+                  {% else %}
+                    <p>Aquest vídeo no és de YouTube.</p>
+                    <p class="grey-text">
+                      Es troba a <b>{{ equip.domini_video }}</b>.
+                      Obre l'enllaç per accedir-hi.
+                    </p>
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              <div class="card-content">
+                <span class="card-title">{{ equip.nom }}</span>
+                <p class="grey-text">{{ equip.projecte.nom }}</p>
+                <div class="video-links">
+                  <a class="btn-small waves-effect waves-light"
+                     href="{{ equip.link_video }}"
+                     target="_blank"
+                     rel="noopener noreferrer">
+                    <i class="material-icons left">open_in_new</i>Obrir vídeo
+                  </a>
+                  <a class="btn-small waves-effect waves-light grey"
+                     href="{% url 'projecte' equip.projecte.id %}">
+                    <i class="material-icons left">assignment</i>Veure specs
+                  </a>
+                </div>
+                {% if not youtube_id %}
+                  <p class="video-url">
+                    <a href="{{ equip.link_video }}" target="_blank" rel="noopener noreferrer">
+                      {{ equip.link_video }}
+                    </a>
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endwith %}
+      {% empty %}
+        <div class="col s12">
+          <div class="card-panel">
+            Encara no hi ha cap equip amb un enllaç de vídeo.
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

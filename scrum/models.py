@@ -1,4 +1,6 @@
 import datetime
+import re
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -177,6 +179,60 @@ class Projecte(models.Model):
         )
 
 
+YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
+
+
+def _url_video(url):
+    if not url:
+        return None
+    url = url.strip()
+    if "://" not in url:
+        url = "https://" + url
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https"):
+        return None
+    return parsed
+
+
+def _es_host_youtube(host):
+    host = (host or "").lower()
+    return (
+        host == "youtu.be"
+        or host == "youtube.com"
+        or host.endswith(".youtube.com")
+        or host == "youtube-nocookie.com"
+        or host.endswith(".youtube-nocookie.com")
+    )
+
+
+def _extract_youtube_id(url):
+    parsed = _url_video(url)
+    if parsed is None or not _es_host_youtube(parsed.hostname):
+        return ""
+
+    host = (parsed.hostname or "").lower()
+    if host == "youtu.be":
+        candidats = [part for part in parsed.path.split("/") if part][:1]
+    elif parsed.path.rstrip("/") == "/watch":
+        candidats = parse_qs(parsed.query).get("v", [])
+    else:
+        parts = [part for part in parsed.path.split("/") if part]
+        candidats = (
+            [parts[1]]
+            if len(parts) >= 2
+            and parts[0] in ("embed", "live", "shorts")
+            else []
+        )
+
+    for candidat in candidats:
+        if YOUTUBE_ID_RE.fullmatch(candidat):
+            return candidat
+    return ""
+
+
 class Equip(models.Model):
     """Equip de treball d'un projecte."""
 
@@ -191,9 +247,27 @@ class Equip(models.Model):
         Projecte, on_delete=models.CASCADE, related_name="equips"
     )
     membres = models.ManyToManyField(User, blank=True, related_name="equips")
+    link_video = models.URLField(
+        max_length=500,
+        blank=True,
+        verbose_name="enllaç del vídeo",
+        help_text="Enllaç de YouTube o d'una altra plataforma de vídeo.",
+    )
 
     def __str__(self):
         return self.nom
+
+    def video_youtube_id(self):
+        return _extract_youtube_id(self.link_video)
+
+    def es_video_youtube(self):
+        parsed = _url_video(self.link_video)
+        return parsed is not None and _es_host_youtube(parsed.hostname)
+
+    def domini_video(self):
+        parsed = _url_video(self.link_video)
+        host = (parsed.hostname or "") if parsed else ""
+        return host[4:] if host.startswith("www.") else host
 
 
 class Sprint(models.Model):
@@ -346,13 +420,14 @@ class Qualificacio(models.Model):
         qualificació no tingui encara un DoneSpec per a elles (per exemple,
         si la spec s'ha afegit després de crear la qualificació).
         """
-        completacio_by_spec = {
-            dspec.spec_id: dspec.fraccio for dspec in self.done_specs.all()
+        done_specs_by_spec = {
+            dspec.spec_id: dspec
+            for dspec in self.done_specs.prefetch_related("percentatges_mp")
         }
         mps = {}
         for spec in self.sprint.specs.all():
             hores = spec.hores_estimades or 0
-            fraccio = completacio_by_spec.get(spec.id, 0)
+            done_spec = done_specs_by_spec.get(spec.id)
             for mp in spec.mp.all():
                 if mp.id not in mps:
                     mps[mp.id] = {
@@ -362,6 +437,7 @@ class Qualificacio(models.Model):
                         "specs_total": 0,
                         "specs_done": 0,
                     }
+                fraccio = done_spec.fraccio_per_mp(mp) if done_spec else 0
                 mps[mp.id]["total"] += hores
                 mps[mp.id]["done"] += hores * fraccio
                 mps[mp.id]["specs_total"] += 1
@@ -444,6 +520,10 @@ class DoneSpec(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         verbose_name="percentatge de compleció",
     )
+    qualificacio_individual = models.BooleanField(
+        default=False,
+        verbose_name="qualificació individual per mòdul professional",
+    )
 
     def __str__(self):
         return "{} : {} ({:.1f}%)".format(
@@ -453,6 +533,54 @@ class DoneSpec(models.Model):
     @property
     def ordre(self):
         return self.spec.ordre
+
+    @property
+    def fraccio(self):
+        return min(max(self.percentatge or 0, 0), 100) / 100
+
+    def fraccio_per_mp(self, mp):
+        if not self.qualificacio_individual:
+            return self.fraccio
+        for percentatge in self.percentatges_mp.all():
+            if percentatge.mp_id == mp.id:
+                return percentatge.fraccio
+        return self.fraccio
+
+
+class DoneSpecPercentatgeMP(models.Model):
+    """Percentatge de compleció d'un MP dins d'una spec qualificada."""
+
+    class Meta:
+        verbose_name = "percentatge de mòdul professional"
+        verbose_name_plural = "percentatges de mòduls professionals"
+        ordering = ["mp__numero", "mp__nom"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["done_spec", "mp"],
+                name="unique_donespec_percentatge_mp",
+            )
+        ]
+
+    done_spec = models.ForeignKey(
+        DoneSpec,
+        on_delete=models.CASCADE,
+        related_name="percentatges_mp",
+    )
+    mp = models.ForeignKey(
+        ModulProfessional,
+        on_delete=models.CASCADE,
+        related_name="percentatges_done_spec",
+    )
+    percentatge = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name="percentatge de compleció",
+    )
+
+    def __str__(self):
+        return "{} : {} ({:.1f}%)".format(
+            self.done_spec.spec.nom, self.mp.nom, self.percentatge
+        )
 
     @property
     def fraccio(self):

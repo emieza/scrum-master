@@ -50,6 +50,33 @@
   border-bottom: 1px solid #26a69a;
   box-shadow: 0 1px 0 0 #26a69a;
 }
+#modal-specs .spec-percentatge-etiqueta {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+#modal-specs .spec-percentatges-mp {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 0.35rem;
+}
+#modal-specs .spec-percentatges-mp summary {
+  cursor: pointer;
+  color: #455a64;
+  font-size: 0.9rem;
+  padding: 0.35rem 0;
+}
+#modal-specs .spec-mp-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.3rem 0 0.3rem 1rem;
+}
+#modal-specs .spec-mp-nom {
+  flex: 1 1 auto;
+}
 {% endblock %}
 
 {% block content %}
@@ -257,13 +284,17 @@
       });
   }
 
+  function etiqueta_mp(mp) {
+    return ("0000" + mp.numero).slice(-4) + " " + mp.nom;
+  }
+
   function crea_xips_mps(mps) {
     var contenidor = document.createElement("span");
     contenidor.className = "spec-mps";
     (mps || []).forEach(function (mp) {
       var xip = document.createElement("span");
       xip.className = "chip";
-      xip.textContent = mp.nom;
+      xip.textContent = etiqueta_mp(mp);
       contenidor.appendChild(xip);
     });
     return contenidor;
@@ -309,6 +340,9 @@
 
           var percentatge = document.createElement("label");
           percentatge.className = "spec-percentatge";
+          var etiqueta = document.createElement("span");
+          etiqueta.className = "spec-percentatge-etiqueta";
+          etiqueta.textContent = "Global";
           var input = document.createElement("input");
           input.type = "number";
           input.min = "0";
@@ -320,12 +354,58 @@
           });
           var sufix = document.createElement("span");
           sufix.textContent = "%";
+          percentatge.appendChild(etiqueta);
           percentatge.appendChild(input);
           percentatge.appendChild(sufix);
 
           fila.appendChild(text);
           fila.appendChild(percentatge);
           li.appendChild(fila);
+
+          if (ds.percentatges_mp && ds.percentatges_mp.length >= 2) {
+            var desplegable = document.createElement("details");
+            desplegable.className = "spec-percentatges-mp";
+            desplegable.open = !!ds.qualificacio_individual;
+            var resum = document.createElement("summary");
+            resum.textContent = "Qualificar per mòduls professionals";
+            desplegable.appendChild(resum);
+
+            ds.percentatges_mp.forEach(function (dadaMp) {
+              var filaMp = document.createElement("div");
+              filaMp.className = "spec-mp-fila";
+
+              var nomMp = document.createElement("span");
+              nomMp.className = "spec-mp-nom";
+              nomMp.textContent = etiqueta_mp(dadaMp);
+
+              var percentatgeMp = document.createElement("label");
+              percentatgeMp.className = "spec-percentatge";
+              var inputMp = document.createElement("input");
+              inputMp.type = "number";
+              inputMp.min = "0";
+              inputMp.max = "100";
+              inputMp.step = "1";
+              inputMp.className = "spec-percentatge-mp-input";
+              inputMp.setAttribute("data-mp-id", dadaMp.id);
+              inputMp.value = dadaMp.percentatge;
+              inputMp.addEventListener("change", function () {
+                actualitza_percentatges_mps(
+                  ds.id, desplegable, input
+                );
+              });
+              var sufixMp = document.createElement("span");
+              sufixMp.textContent = "%";
+              percentatgeMp.appendChild(inputMp);
+              percentatgeMp.appendChild(sufixMp);
+
+              filaMp.appendChild(nomMp);
+              filaMp.appendChild(percentatgeMp);
+              desplegable.appendChild(filaMp);
+            });
+
+            li.appendChild(desplegable);
+          }
+
           list.appendChild(li);
         });
 
@@ -355,9 +435,63 @@
           return;
         }
         input.value = resp.done_spec.percentatge;
+        var li = input.closest("li");
+        var desplegable = li
+          ? li.querySelector(".spec-percentatges-mp")
+          : null;
+        if (desplegable) {
+          desplegable.open = false;
+          Array.prototype.forEach.call(
+            desplegable.querySelectorAll(".spec-percentatge-mp-input"),
+            function (inputMp) {
+              inputMp.value = resp.done_spec.percentatge;
+            }
+          );
+        }
       })
       .catch(function () {
         alert("ERROR en l'actualització de la spec.");
+      });
+  }
+
+  function actualitza_percentatges_mps(doneSpecId, desplegable, inputGlobal) {
+    var inputs = desplegable.querySelectorAll(
+      ".spec-percentatge-mp-input"
+    );
+    var dades = {};
+    Array.prototype.forEach.call(inputs, function (input) {
+      var percentatge = parseFloat(input.value);
+      if (isNaN(percentatge)) percentatge = 0;
+      percentatge = Math.max(0, Math.min(100, percentatge));
+      input.value = percentatge;
+      dades["mp_" + input.getAttribute("data-mp-id")] = percentatge;
+    });
+
+    return marca_desament(post(
+      "/scrum/api/set_percentatges_done_spec_mp/" + doneSpecId,
+      dades
+    ))
+      .then(function (resp) {
+        if (resp.status !== "OK") {
+          alert("ERROR al modificar els percentatges per MP.");
+          return;
+        }
+        var doneSpec = resp.done_spec;
+        inputGlobal.value = doneSpec.percentatge;
+        var percentatges = {};
+        (doneSpec.percentatges_mp || []).forEach(function (dada) {
+          percentatges[dada.id] = dada.percentatge;
+        });
+        Array.prototype.forEach.call(inputs, function (input) {
+          var mpId = parseInt(input.getAttribute("data-mp-id"), 10);
+          if (Object.prototype.hasOwnProperty.call(percentatges, mpId)) {
+            input.value = percentatges[mpId];
+          }
+        });
+        desplegable.open = true;
+      })
+      .catch(function () {
+        alert("ERROR en l'actualització dels percentatges per MP.");
       });
   }
 

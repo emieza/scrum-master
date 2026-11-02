@@ -7,6 +7,11 @@ urlpatterns = [
     path("scrum/projecte", views.index, name="projectes"),
     path("scrum/projectes", views.index, name="projectes2"),
     path("scrum/projecte/<int:id>", views.projecte, name="projecte"),
+    path(
+        "scrum/projectes/<int:id>/clona",
+        views.clona_projecte,
+        name="clona_projecte",
+    ),
     path("scrum/qualifica", views.qualifica, name="qualifica"),
     path("scrum/perfil", views.perfil, name="perfil"),
     path("scrum/api/cerca_centres", views.cerca_centres, name="cerca_centres"),
@@ -68,8 +73,14 @@ urlpatterns = [
         views.edita_sprint,
         name="edita_sprint",
     ),
+    path("scrum/videos", views.videos, name="videos"),
     path("scrum/equips", views.els_meus_equips, name="els_meus_equips"),
     path("scrum/equips/nou", views.crea_equip, name="crea_equip"),
+    path(
+        "scrum/equips/<int:id>/edita",
+        views.edita_equip,
+        name="edita_equip",
+    ),
     path("scrum/api/cerca_usuaris", views.cerca_usuaris, name="cerca_usuaris"),
     path(
         "scrum/descarrega_qualificacions/<int:projecte_id>",
@@ -101,6 +112,11 @@ urlpatterns = [
         "scrum/api/set_percentatge_done_spec/<int:done_spec_id>",
         views.set_percentatge_done_spec,
         name="set_percentatge_done_spec",
+    ),
+    path(
+        "scrum/api/set_percentatges_done_spec_mp/<int:done_spec_id>",
+        views.set_percentatges_done_spec_mp,
+        name="set_percentatges_done_spec_mp",
     ),
     path(
         "scrum/api/set_comment_to_qualificacio/<int:qualificacio_id>",

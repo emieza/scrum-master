@@ -16,6 +16,7 @@ from .models import (
     Centre,
     Cicle,
     DoneSpec,
+    DoneSpecPercentatgeMP,
     Equip,
     ModulProfessional,
     Projecte,
@@ -92,6 +93,367 @@ class ScrumTests(TestCase):
         response = self.client.get(reverse("projectes"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Projecte de prova")
+
+    def test_llista_projectes_anonima_no_mostra_go_ni_clonar(self):
+        response = self.client.get(reverse("projectes"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Go!")
+        self.assertNotContains(response, "Clonar")
+
+    def test_llista_projectes_filtra_pel_nom_del_projecte(self):
+        Projecte.objects.create(
+            nom="Projecte d'altra cosa",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        response = self.client.get(reverse("projectes"), {"nom": "PROVA"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Projecte de prova")
+        self.assertNotContains(response, "Projecte d&#x27;altra cosa")
+
+    def test_llista_projectes_filtra_pel_centre_educatiu(self):
+        altre_centre = Centre.objects.create(
+            nom="Institut Altre",
+            poblacio="Tarragona",
+            cp="43001",
+            email="altre@example.cat",
+        )
+        Projecte.objects.create(
+            nom="Projecte d'un altre centre",
+            centre=altre_centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        response = self.client.get(reverse("projectes"), {"centre": "Altre"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Projecte d&#x27;un altre centre")
+        self.assertNotContains(response, "Projecte de prova")
+
+    def test_llista_projectes_filtra_pel_nom_del_cicle(self):
+        altre_cicle = Cicle.objects.create(
+            grau="CFGM", codi="SMX", nom="Sistemes microinformàtics"
+        )
+        Projecte.objects.create(
+            nom="Projecte de sistemes",
+            centre=self.centre,
+            cicle=altre_cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        response = self.client.get(reverse("projectes"), {"cicle": "micro"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Projecte de sistemes")
+        self.assertNotContains(response, "Projecte de prova")
+
+    def test_llista_projectes_filtra_per_nom_codi_de_cicle(self):
+        altre_cicle = Cicle.objects.create(
+            grau="CFGM", codi="SMX", nom="Sistemes microinformàtics"
+        )
+        Projecte.objects.create(
+            nom="Projecte de sistemes",
+            centre=self.centre,
+            cicle=altre_cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        response = self.client.get(reverse("projectes"), {"cicle": "SMX"})
+        self.assertContains(response, "Projecte de sistemes")
+        self.assertNotContains(response, "Projecte de prova")
+
+    def test_llista_projectes_filtra_de_forma_general_i_neteja_els_filtres(self):
+        altre_centre = Centre.objects.create(
+            nom="Institut Altre",
+            poblacio="Tarragona",
+            cp="43001",
+            email="altre@example.cat",
+        )
+        Projecte.objects.create(
+            nom="Projecte d'un altre centre",
+            centre=altre_centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        response = self.client.get(reverse("projectes"), {"q": "Altre"})
+        self.assertContains(response, "Projecte d&#x27;un altre centre")
+        self.assertNotContains(response, "Projecte de prova")
+        self.assertContains(response, reverse("projectes"))
+        self.assertContains(response, "Neteja els filtres")
+
+        response = self.client.get(reverse("projectes"), {"nom": "inexistent"})
+        self.assertContains(
+            response, "No hi ha cap projecte que coincideixi amb els filtres."
+        )
+
+    def test_llista_projectes_mostra_els_valors_dels_filtres(self):
+        response = self.client.get(
+            reverse("projectes"),
+            {"nom": "prova", "centre": "Exemple", "cicle": "DAW"},
+        )
+        self.assertContains(response, 'value="prova"')
+        self.assertContains(response, 'value="Exemple"')
+        self.assertContains(response, 'value="DAW"')
+
+    def test_llista_projectes_loguejada_mostra_el_boto_de_clonar(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("projectes"))
+        self.assertContains(response, "Clonar")
+        self.assertNotContains(response, "Go!")
+        self.assertContains(
+            response,
+            'data-nom-clon="Projecte de prova (Còpia)"',
+        )
+        self.assertContains(
+            response,
+            reverse("clona_projecte", args=[self.projecte.id]),
+        )
+        self.assertContains(
+            response,
+            "btn btn-small waves-effect waves-light modal-trigger",
+        )
+
+    def test_nom_per_defecte_de_clon_evita_colisions(self):
+        Projecte.objects.create(
+            nom="Projecte de prova (Còpia)",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        Projecte.objects.create(
+            nom="Projecte de prova (Còpia 2)",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("projectes"))
+        self.assertContains(
+            response,
+            'data-nom-clon="Projecte de prova (Còpia 3)"',
+        )
+
+    def test_nom_per_defecte_de_clon_incrementa_el_sufix_de_copia(self):
+        Projecte.objects.create(
+            nom="Projecte de prova (Còpia)",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("projectes"))
+        self.assertContains(
+            response,
+            'data-nom-clon="Projecte de prova (Còpia 2)"',
+        )
+        self.assertNotContains(
+            response,
+            "Projecte de prova (Còpia) (Còpia)",
+        )
+
+    def test_nom_per_defecte_de_clon_continua_la_numeracio_de_copia(self):
+        Projecte.objects.create(
+            nom="Projecte de prova (Còpia 2)",
+            centre=self.centre,
+            cicle=self.cicle,
+            inici=datetime.date.today(),
+            final=datetime.date.today() + datetime.timedelta(days=30),
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("projectes"))
+        self.assertContains(
+            response,
+            'data-nom-clon="Projecte de prova (Còpia 3)"',
+        )
+        self.assertNotContains(
+            response,
+            "Projecte de prova (Còpia 2) (Còpia)",
+        )
+
+    def test_clona_projecte_requereix_login(self):
+        response = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "Projecte clonat"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("account_login"), response.url)
+
+    def test_clona_projecte_copia_el_projecte_els_sprints_i_les_specs(self):
+        self.sprint.notes = "Notes originals"
+        self.sprint.save(update_fields=["notes"])
+        self.spec.descripcio = "<p>Descripció de la spec</p>"
+        self.spec.save(update_fields=["descripcio"])
+        sprint_2 = Sprint.objects.create(
+            nom="Sprint 2",
+            notes="Notes del segon sprint",
+            projecte=self.projecte,
+            inici=datetime.date.today() + datetime.timedelta(days=10),
+            final=datetime.date.today() + datetime.timedelta(days=17),
+        )
+        spec_2 = Spec.objects.create(
+            nom="Spec filla",
+            descripcio="<p>Descripció filla</p>",
+            pare=self.spec,
+            projecte=self.projecte,
+            ordre=2,
+            hores_estimades=4,
+        )
+        spec_2.mp.add(self.mp)
+        spec_2.sprints.add(sprint_2)
+        Equip.objects.create(nom="Equip original", projecte=self.projecte)
+
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "Projecte clonat"},
+        )
+
+        self.assertRedirects(resposta, reverse("els_meus_projectes"))
+        clon = Projecte.objects.get(nom="Projecte clonat")
+        self.assertEqual(clon.descripcio, self.projecte.descripcio)
+        self.assertEqual(clon.centre, self.centre)
+        self.assertEqual(clon.cicle, self.cicle)
+        self.assertTrue(clon.admins.filter(pk=self.user.pk).exists())
+        self.assertEqual(clon.equips.count(), 0)
+        self.assertEqual(clon.inici, datetime.date.today())
+        self.assertEqual(
+            clon.final,
+            datetime.date.today() + datetime.timedelta(days=30),
+        )
+
+        sprints_clonats = list(clon.sprints.order_by("inici", "id"))
+        self.assertEqual([s.nom for s in sprints_clonats], ["Sprint 1", "Sprint 2"])
+        self.assertEqual(sprints_clonats[0].notes, "Notes originals")
+        self.assertEqual(sprints_clonats[0].inici, datetime.date.today())
+        self.assertEqual(
+            sprints_clonats[0].final,
+            datetime.date.today() + datetime.timedelta(days=7),
+        )
+        self.assertEqual(
+            sprints_clonats[1].inici,
+            datetime.date.today() + datetime.timedelta(days=10),
+        )
+        self.assertEqual(
+            sprints_clonats[1].final,
+            datetime.date.today() + datetime.timedelta(days=17),
+        )
+        self.assertEqual(
+            sprints_clonats[1].final - sprints_clonats[1].inici,
+            datetime.timedelta(days=7),
+        )
+
+        specs_clonades = {spec.nom: spec for spec in clon.specs.all()}
+        self.assertEqual(set(specs_clonades), {"Pantalla d'inici", "Spec filla"})
+        spec_arrel = specs_clonades["Pantalla d'inici"]
+        spec_filla = specs_clonades["Spec filla"]
+        self.assertEqual(spec_arrel.descripcio, self.spec.descripcio)
+        self.assertEqual(spec_arrel.hores_estimades, 8)
+        self.assertTrue(spec_arrel.mp.filter(pk=self.mp.pk).exists())
+        self.assertEqual(
+            list(spec_arrel.sprints.all()),
+            [sprints_clonats[0]],
+        )
+        self.assertEqual(spec_filla.pare, spec_arrel)
+        self.assertEqual(spec_filla.hores_estimades, 4)
+        self.assertTrue(spec_filla.mp.filter(pk=self.mp.pk).exists())
+        self.assertEqual(
+            list(spec_filla.sprints.all()),
+            [sprints_clonats[1]],
+        )
+
+    def test_modal_de_clonar_te_el_reset_d_hores_activat_per_defecte(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("projectes"))
+        self.assertContains(
+            response,
+            'name="reseteja_hores_estimades"',
+        )
+        self.assertContains(response, 'id="clonar-reseteja-hores" checked')
+        self.assertContains(
+            response,
+            "Reseteja les hores estimades de les specs a zero",
+        )
+
+    def test_clona_projecte_reseteja_les_hores_estimades_de_les_specs(self):
+        Spec.objects.create(
+            nom="Spec amb hores",
+            projecte=self.projecte,
+            ordre=2,
+            hores_estimades=4.5,
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {
+                "nom": "Projecte sense hores",
+                "reseteja_hores_estimades": "on",
+            },
+        )
+        self.assertRedirects(resposta, reverse("els_meus_projectes"))
+        clon = Projecte.objects.get(nom="Projecte sense hores")
+        self.assertEqual(
+            list(clon.specs.order_by("ordre").values_list("hores_estimades", flat=True)),
+            [0, 0],
+        )
+
+    def test_clona_projecte_conserva_les_hores_si_no_es_demana_reset(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "Projecte amb hores", "reseteja_hores_estimades": ""},
+        )
+        self.assertRedirects(resposta, reverse("els_meus_projectes"))
+        clon = Projecte.objects.get(nom="Projecte amb hores")
+        self.assertEqual(clon.specs.get().hores_estimades, 8)
+
+    def test_clona_projecte_rebutja_un_nom_ocupat(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "  projecte DE PROVA  "},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 400)
+        self.assertFalse(resposta.json()["ok"])
+        self.assertIn(
+            "Ja existeix un projecte amb aquest nom.",
+            resposta.json()["errors"],
+        )
+        self.assertEqual(Projecte.objects.count(), 1)
+
+    def test_clona_projecte_rebutja_un_nom_buit(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "   "},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn(
+            "El nom del projecte és obligatori.",
+            resposta.json()["errors"],
+        )
+        self.assertEqual(Projecte.objects.count(), 1)
+
+    def test_clona_projecte_retorna_json_per_a_ajax(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        resposta = self.client.post(
+            reverse("clona_projecte", args=[self.projecte.id]),
+            {"nom": "Projecte clonat per Ajax"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 200)
+        dades = resposta.json()
+        self.assertTrue(dades["ok"])
+        self.assertEqual(dades["redirect"], reverse("els_meus_projectes"))
+        self.assertTrue(
+            Projecte.objects.filter(nom="Projecte clonat per Ajax").exists()
+        )
 
     def test_detall_projecte(self):
         response = self.client.get(reverse("projecte", args=[self.projecte.id]))
@@ -260,8 +622,9 @@ class ScrumTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "crea_xips_mps")
+        self.assertContains(response, "etiqueta_mp")
         self.assertContains(response, 'xip.className = "chip"')
-        self.assertContains(response, "xip.textContent = mp.nom")
+        self.assertContains(response, "xip.textContent = etiqueta_mp(mp)")
         self.assertContains(response, 'input.type = "number"')
         self.assertContains(response, "set_percentatge_done_spec")
         self.assertNotContains(response, "toggle_done_spec")
@@ -366,7 +729,130 @@ class ScrumTests(TestCase):
         done_spec.refresh_from_db()
         self.assertEqual(done_spec.percentatge, 65.5)
 
-    def test_percentatges_mps_inclou_specs_afegides_despres(self):
+    def test_api_actualitza_percentatges_mp_individuals(self):
+        equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
+        quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
+        done_spec = DoneSpec.objects.create(
+            qualificacio=quali, spec=self.spec, percentatge=0
+        )
+        mp2 = ModulProfessional.objects.create(
+            numero=7, nom="Desenvolupament web en entorn servidor", cicle=self.cicle
+        )
+        self.spec.mp.add(mp2)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+
+        response = self.client.post(
+            reverse("set_percentatges_done_spec_mp", args=[done_spec.id]),
+            {
+                "mp_{}".format(self.mp.id): "100",
+                "mp_{}".format(mp2.id): "50",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["done_spec"]
+        self.assertTrue(data["qualificacio_individual"])
+        self.assertEqual(data["percentatge"], 75.0)
+        self.assertEqual(
+            {dada["id"]: dada["percentatge"] for dada in data["percentatges_mp"]},
+            {self.mp.id: 100.0, mp2.id: 50.0},
+        )
+        self.assertEqual(
+            {
+                dada["id"]: dada["numero"]
+                for dada in data["percentatges_mp"]
+            },
+            {self.mp.id: self.mp.numero, mp2.id: mp2.numero},
+        )
+        self.assertEqual(
+            {
+                dada["id"]: dada["numero"]
+                for dada in data["spec"]["mp"]
+            },
+            {self.mp.id: self.mp.numero, mp2.id: mp2.numero},
+        )
+
+        done_spec.refresh_from_db()
+        self.assertTrue(done_spec.qualificacio_individual)
+        self.assertEqual(done_spec.percentatge, 75.0)
+        self.assertEqual(
+            {
+                percentatge.mp_id: percentatge.percentatge
+                for percentatge in DoneSpecPercentatgeMP.objects.filter(
+                    done_spec=done_spec
+                )
+            },
+            {self.mp.id: 100.0, mp2.id: 50.0},
+        )
+
+        dades = {d["obj"].id: d for d in quali.percentatges_mps()}
+        self.assertEqual(dades[self.mp.id]["percentatge"], 100.0)
+        self.assertEqual(dades[mp2.id]["percentatge"], 50.0)
+
+    def test_percentatge_global_esborra_la_qualificacio_individual(self):
+        equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
+        quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
+        done_spec = DoneSpec.objects.create(
+            qualificacio=quali,
+            spec=self.spec,
+            percentatge=75,
+            qualificacio_individual=True,
+        )
+        DoneSpecPercentatgeMP.objects.create(
+            done_spec=done_spec, mp=self.mp, percentatge=75
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+
+        response = self.client.post(
+            reverse("set_percentatge_done_spec", args=[done_spec.id]),
+            {"percentatge": "40"},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["done_spec"]
+        self.assertFalse(data["qualificacio_individual"])
+        self.assertEqual(data["percentatge"], 40.0)
+        self.assertEqual(
+            data["percentatges_mp"][0]["percentatge"], 40.0
+        )
+
+        done_spec.refresh_from_db()
+        self.assertFalse(done_spec.qualificacio_individual)
+        self.assertEqual(done_spec.percentatge, 40.0)
+        self.assertFalse(
+            DoneSpecPercentatgeMP.objects.filter(done_spec=done_spec).exists()
+        )
+
+    def test_api_actualitza_percentatges_mp_valida_les_dades(self):
+        equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
+        quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
+        done_spec = DoneSpec.objects.create(
+            qualificacio=quali, spec=self.spec, percentatge=0
+        )
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+
+        response = self.client.post(
+            reverse("set_percentatges_done_spec_mp", args=[done_spec.id]),
+            {"mp_{}".format(self.mp.id): "-1"},
+        )
+        self.assertEqual(response.status_code, 400)
+        done_spec.refresh_from_db()
+        self.assertFalse(done_spec.qualificacio_individual)
+        self.assertFalse(
+            DoneSpecPercentatgeMP.objects.filter(done_spec=done_spec).exists()
+        )
+
+    def test_dialeg_qualificacio_mostra_qualificacio_individual_per_mp(self):
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("qualifica_projecte", args=[self.projecte.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Qualificar per mòduls professionals")
+        self.assertContains(response, "set_percentatges_done_spec_mp")
+        self.assertContains(response, "spec-percentatges-mp")
+        self.assertContains(response, "spec-percentatge-mp-input")
+        self.assertContains(response, "qualificacio_individual")
+        self.assertContains(response, "etiqueta_mp")
+
         equip = Equip.objects.create(nom="Equip Alpha", projecte=self.projecte)
         quali = Qualificacio.objects.create(equip=equip, sprint=self.sprint)
         DoneSpec.objects.create(qualificacio=quali, spec=self.spec, percentatge=100)
@@ -600,6 +1086,100 @@ class ScrumTests(TestCase):
         self.assertEqual(equip.descripcio, "Descripció de l'equip")
         self.assertEqual(set(equip.membres.all()), {self.user, alumne})
 
+    def test_equip_detecta_els_identificadors_de_video_de_youtube(self):
+        equip = Equip(nom="Equip vídeo", projecte=self.projecte)
+        identificador = "dQw4w9WgXcQ"
+        enllacos = (
+            "https://www.youtube.com/watch?v={}".format(identificador),
+            "https://youtu.be/{}?t=10".format(identificador),
+            "https://youtube.com/shorts/{}".format(identificador),
+            "https://www.youtube.com/embed/{}".format(identificador),
+            "youtube.com/watch?v={}".format(identificador),
+        )
+        for enllac in enllacos:
+            equip.link_video = enllac
+            self.assertEqual(equip.video_youtube_id(), identificador)
+            self.assertTrue(equip.es_video_youtube())
+
+    def test_equip_amb_video_extern_mostra_el_domini(self):
+        equip = Equip(
+            nom="Equip extern",
+            projecte=self.projecte,
+            link_video="https://drive.google.com/file/d/abc/view",
+        )
+        self.assertEqual(equip.video_youtube_id(), "")
+        self.assertFalse(equip.es_video_youtube())
+        self.assertEqual(equip.domini_video(), "drive.google.com")
+
+    def test_crea_equip_amb_enllac_de_video(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_equip"),
+            {
+                "nom": "Equip amb vídeo",
+                "projecte": self.projecte.id,
+                "link_video": "youtu.be/dQw4w9WgXcQ",
+            },
+        )
+        self.assertRedirects(response, reverse("crea_equip"))
+        equip = Equip.objects.get(nom="Equip amb vídeo")
+        self.assertEqual(equip.link_video, "https://youtu.be/dQw4w9WgXcQ")
+
+    def test_crea_equip_rebutja_un_enllac_de_video_invalid(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("crea_equip"),
+            {
+                "nom": "Equip amb vídeo invàlid",
+                "projecte": self.projecte.id,
+                "link_video": "això no és una url",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "del vídeo no és una URL vàlida.")
+        self.assertFalse(
+            Equip.objects.filter(nom="Equip amb vídeo invàlid").exists()
+        )
+
+    def test_videos_mostra_preview_de_youtube_i_enllacos_externs(self):
+        Equip.objects.create(
+            nom="Equip YouTube",
+            projecte=self.projecte,
+            link_video="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        )
+        Equip.objects.create(
+            nom="Equip Drive",
+            projecte=self.projecte,
+            link_video="https://drive.google.com/file/d/abc/view",
+        )
+        Equip.objects.create(nom="Equip sense vídeo", projecte=self.projecte)
+
+        response = self.client.get(reverse("videos"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vídeos dels projectes Scrum")
+        self.assertContains(response, "Equip YouTube")
+        self.assertContains(response, "Equip Drive")
+        self.assertNotContains(response, "Equip sense vídeo")
+        self.assertContains(
+            response,
+            "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+        )
+        self.assertContains(response, "Aquest vídeo no és de YouTube.")
+        self.assertContains(response, "drive.google.com")
+        self.assertContains(
+            response,
+            reverse("projecte", args=[self.projecte.id]),
+        )
+
+    def test_navbar_mostra_enllac_a_videos(self):
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, reverse("videos"))
+        self.assertContains(response, "Vídeos")
+
     def test_crea_equip_afegeix_el_creador_com_a_membre(self):
         self.user.centre = self.centre
         self.user.save(update_fields=["centre"])
@@ -711,6 +1291,156 @@ class ScrumTests(TestCase):
         response = self.client.get(reverse("els_meus_equips"))
         self.assertContains(response, reverse("crea_equip"))
         self.assertContains(response, "Crea equip")
+
+    def test_els_meus_equips_mostra_botons_de_projecte_i_edicio(self):
+        equip = Equip.objects.create(nom="Equip amb botons", projecte=self.projecte)
+        equip.membres.add(self.user)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(reverse("els_meus_equips"))
+        self.assertContains(response, reverse("projecte", args=[self.projecte.id]))
+        self.assertContains(response, reverse("edita_equip", args=[equip.id]))
+        self.assertContains(response, "Anar al projecte")
+        self.assertContains(response, "Editar equip")
+        self.assertNotContains(
+            response,
+            '<a href="{}">{}</a>'.format(
+                reverse("projecte", args=[self.projecte.id]), equip.nom
+            ),
+        )
+
+    def test_edita_equip_requereix_login(self):
+        equip = Equip.objects.create(nom="Equip privat", projecte=self.projecte)
+        equip.membres.add(self.user)
+        response = self.client.get(
+            reverse("edita_equip", args=[equip.id])
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_edita_equip_mostra_les_dades_i_els_membres(self):
+        equip = Equip.objects.create(
+            nom="Equip editable",
+            descripcio="Descripció original",
+            link_video="https://youtu.be/dQw4w9WgXcQ",
+            projecte=self.projecte,
+        )
+        equip.membres.add(self.user)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_equip", args=[equip.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edita l'equip")
+        self.assertContains(response, 'value="Equip editable"')
+        self.assertContains(response, "Descripció original")
+        self.assertContains(response, 'value="https://youtu.be/dQw4w9WgXcQ"')
+        self.assertContains(response, self.user.email)
+        self.assertContains(response, "Desa els canvis")
+
+    def test_edita_equip_actualitza_les_dades_i_els_membres(self):
+        self.user.centre = self.centre
+        self.user.save(update_fields=["centre"])
+        alumne = User.objects.create_user(
+            username="alumne-edicio",
+            email="alumne-edicio@example.cat",
+            password="contrasenya123",
+        )
+        equip = Equip.objects.create(
+            nom="Equip original",
+            descripcio="Descripció original",
+            projecte=self.projecte,
+        )
+        equip.membres.add(self.user, alumne)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_equip", args=[equip.id]),
+            {
+                "nom": "Equip actualitzat",
+                "descripcio": "Descripció nova",
+                "link_video": "youtu.be/dQw4w9WgXcQ",
+                "projecte": self.projecte.id,
+                "membres": [self.user.id],
+            },
+        )
+        self.assertRedirects(response, reverse("els_meus_equips"))
+        equip.refresh_from_db()
+        self.assertEqual(equip.nom, "Equip actualitzat")
+        self.assertEqual(equip.descripcio, "Descripció nova")
+        self.assertEqual(equip.link_video, "https://youtu.be/dQw4w9WgXcQ")
+        self.assertEqual(equip.projecte, self.projecte)
+        self.assertEqual(set(equip.membres.all()), {self.user})
+
+    def test_edita_equip_permet_mantenir_el_mateix_nom(self):
+        equip = Equip.objects.create(
+            nom="Equip sense canvis de nom",
+            descripcio="Descripció original",
+            projecte=self.projecte,
+        )
+        equip.membres.add(self.user)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_equip", args=[equip.id]),
+            {
+                "nom": equip.nom,
+                "descripcio": "Descripció actualitzada",
+                "projecte": self.projecte.id,
+                "membres": [self.user.id],
+            },
+        )
+        self.assertRedirects(response, reverse("els_meus_equips"))
+        equip.refresh_from_db()
+        self.assertEqual(equip.descripcio, "Descripció actualitzada")
+
+    def test_edita_equip_rebutja_un_nom_duplicat(self):
+        Equip.objects.create(nom="Equip duplicat", projecte=self.projecte)
+        equip = Equip.objects.create(nom="Equip propi", projecte=self.projecte)
+        equip.membres.add(self.user)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_equip", args=[equip.id]),
+            {
+                "nom": "Equip duplicat",
+                "projecte": self.projecte.id,
+                "membres": [self.user.id],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Ja existeix un equip amb aquest nom en aquest projecte."
+        )
+        equip.refresh_from_db()
+        self.assertEqual(equip.nom, "Equip propi")
+
+    def test_edita_equip_rebutja_un_enllac_de_video_invalid(self):
+        equip = Equip.objects.create(nom="Equip vídeo", projecte=self.projecte)
+        equip.membres.add(self.user)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.post(
+            reverse("edita_equip", args=[equip.id]),
+            {
+                "nom": "Equip vídeo",
+                "projecte": self.projecte.id,
+                "link_video": "això no és una url",
+                "membres": [self.user.id],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "del vídeo no és una URL vàlida.")
+        equip.refresh_from_db()
+        self.assertEqual(equip.link_video, "")
+
+    def test_edita_equip_no_permet_editar_equips_d_altres(self):
+        altre_usuari = User.objects.create_user(
+            username="altre-membre",
+            email="altre-membre@example.cat",
+            password="contrasenya123",
+        )
+        equip = Equip.objects.create(nom="Equip aliè", projecte=self.projecte)
+        equip.membres.add(altre_usuari)
+        self.client.login(username="profe@example.cat", password="contrasenya123")
+        response = self.client.get(
+            reverse("edita_equip", args=[equip.id])
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_navbar_mostra_els_meus_equips(self):
         self.client.login(username="profe@example.cat", password="contrasenya123")

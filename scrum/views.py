@@ -7,6 +7,7 @@ from django.contrib.admin.views.autocomplete import AutocompleteJsonView
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -23,6 +24,7 @@ from .models import (
     Centre,
     Cicle,
     DoneSpec,
+    DoneSpecPercentatgeMP,
     Equip,
     ModulProfessional,
     Projecte,
@@ -55,13 +57,195 @@ class ProjecteAutocompleteJsonView(AutocompleteJsonView):
         return qs.filter(Q(cicle=projecte.cicle) | Q(cicle__isnull=True))
 
 
-def index(request):
-    projectes = (
-        Projecte.objects.select_related("centre", "cicle")
-        .prefetch_related("sprints")
-        .order_by("-inici")
+def _noms_projectes_existents():
+    return {nom.casefold() for nom in Projecte.objects.values_list("nom", flat=True)}
+
+
+def _nom_clon_per_defecte(nom, noms_existents):
+    coincidencia = re.match(
+        r"^(?P<base>.*?)\s*\(Còpia(?: (?P<numero>\d+))?\)$",
+        nom,
+        re.IGNORECASE,
     )
-    return render(request, "scrum/projecte_list.html", {"projectes": projectes})
+    if coincidencia:
+        base = coincidencia.group("base")
+        numero = int(coincidencia.group("numero") or 1) + 1
+    else:
+        base = nom
+        numero = 1
+
+    while True:
+        if numero == 1:
+            candidat = "{} (Còpia)".format(base)
+        else:
+            candidat = "{} (Còpia {})".format(base, numero)
+        if candidat.casefold() not in noms_existents:
+            return candidat
+        numero += 1
+
+
+def _clona_projecte(projecte, nom, usuari, reseteja_hores_estimades=False):
+    sprints = list(projecte.sprints.order_by("inici", "id"))
+    avui = datetime.date.today()
+    desplacament = avui - sprints[0].inici if sprints else datetime.timedelta()
+    durada_projecte = max(projecte.final - projecte.inici, datetime.timedelta())
+
+    nou = Projecte.objects.create(
+        nom=nom,
+        descripcio=projecte.descripcio,
+        centre=projecte.centre,
+        cicle=projecte.cicle,
+        inici=avui,
+        final=avui + durada_projecte,
+    )
+    nou.admins.add(usuari)
+
+    mapa_sprints = {}
+    for sprint in sprints:
+        nou_sprint = Sprint.objects.create(
+            nom=sprint.nom,
+            notes=sprint.notes,
+            projecte=nou,
+            inici=sprint.inici + desplacament,
+            final=sprint.final + desplacament,
+        )
+        mapa_sprints[sprint.id] = nou_sprint
+
+    if mapa_sprints:
+        darrer_final = max(sprint.final for sprint in mapa_sprints.values())
+        if nou.final < darrer_final:
+            nou.final = darrer_final
+            nou.save(update_fields=["final"])
+
+    specs = list(projecte.specs.order_by("ordre", "id"))
+    mapa_specs = {}
+    for spec in specs:
+        mapa_specs[spec.id] = Spec.objects.create(
+            nom=spec.nom,
+            descripcio=spec.descripcio,
+            projecte=nou,
+            ordre=spec.ordre,
+            hores_estimades=(
+                0 if reseteja_hores_estimades else spec.hores_estimades
+            ),
+        )
+
+    for spec in specs:
+        nova_spec = mapa_specs[spec.id]
+        if spec.pare_id in mapa_specs:
+            nova_spec.pare = mapa_specs[spec.pare_id]
+            nova_spec.save(update_fields=["pare"])
+        nova_spec.mp.set(spec.mp.all())
+        nova_spec.sprints.set(
+            mapa_sprints[sprint.id]
+            for sprint in spec.sprints.all()
+            if sprint.id in mapa_sprints
+        )
+
+    return nou
+
+
+def index(request):
+    filtre_nom = (
+        request.GET.get("nom", "").strip()
+        or request.GET.get("projecte", "").strip()
+    )
+    filtre_centre = request.GET.get("centre", "").strip()
+    filtre_cicle = request.GET.get("cicle", "").strip()
+    filtre_general = request.GET.get("q", "").strip()
+
+    projectes = Projecte.objects.select_related("centre", "cicle")
+
+    if filtre_nom:
+        projectes = projectes.filter(nom__icontains=filtre_nom)
+    if filtre_centre:
+        condicio_centre = Q(centre__nom__icontains=filtre_centre)
+        if filtre_centre.isdigit():
+            condicio_centre |= Q(centre_id=int(filtre_centre))
+        projectes = projectes.filter(condicio_centre)
+    if filtre_cicle:
+        condicio_cicle = (
+            Q(cicle__nom__icontains=filtre_cicle)
+            | Q(cicle__codi__icontains=filtre_cicle)
+        )
+        if filtre_cicle.isdigit():
+            condicio_cicle |= Q(cicle_id=int(filtre_cicle))
+        projectes = projectes.filter(condicio_cicle)
+    if filtre_general:
+        projectes = projectes.filter(
+            Q(nom__icontains=filtre_general)
+            | Q(centre__nom__icontains=filtre_general)
+            | Q(cicle__nom__icontains=filtre_general)
+            | Q(cicle__codi__icontains=filtre_general)
+        )
+
+    projectes = list(projectes.prefetch_related("sprints").order_by("-inici"))
+    noms_existents = _noms_projectes_existents()
+    for projecte in projectes:
+        projecte.nom_clon = _nom_clon_per_defecte(
+            projecte.nom, noms_existents
+        )
+
+    filtres = {
+        "nom": filtre_nom,
+        "centre": filtre_centre,
+        "cicle": filtre_cicle,
+        "actiu": any(
+            (filtre_nom, filtre_centre, filtre_cicle, filtre_general)
+        ),
+    }
+    return render(
+        request,
+        "scrum/projecte_list.html",
+        {"projectes": projectes, "filtres": filtres},
+    )
+
+
+@login_required
+@require_POST
+def clona_projecte(request, id):
+    projecte = get_object_or_404(Projecte, pk=id)
+    nom = request.POST.get("nom", "").strip()
+    errors = []
+
+    if not nom:
+        errors.append("El nom del projecte és obligatori.")
+    elif len(nom) > 255:
+        errors.append("El nom del projecte no pot superar els 255 caràcters.")
+    elif nom.casefold() in _noms_projectes_existents():
+        errors.append("Ja existeix un projecte amb aquest nom.")
+
+    if errors:
+        if _peticio_ajax(request):
+            return JsonResponse({"ok": False, "errors": errors}, status=400)
+        for error in errors:
+            messages.error(request, error)
+        return redirect("projectes")
+
+    reseteja_hores_estimades = request.POST.get(
+        "reseteja_hores_estimades", ""
+    ).lower() in {"1", "true", "on", "yes"}
+
+    with transaction.atomic():
+        nou = _clona_projecte(
+            projecte,
+            nom,
+            request.user,
+            reseteja_hores_estimades=reseteja_hores_estimades,
+        )
+
+    missatge = "Projecte «{}» clonat correctament.".format(nou.nom)
+    if _peticio_ajax(request):
+        return JsonResponse(
+            {
+                "ok": True,
+                "missatge": missatge,
+                "redirect": reverse("els_meus_projectes"),
+            }
+        )
+
+    messages.success(request, missatge)
+    return redirect("els_meus_projectes")
 
 
 def projecte(request, id):
@@ -859,6 +1043,15 @@ def edita_sprint(request, id):
     return redirect("edita_projecte", id=sprint.projecte_id)
 
 
+def videos(request):
+    equips = (
+        Equip.objects.exclude(link_video="")
+        .select_related("projecte")
+        .order_by("projecte__nom", "nom")
+    )
+    return render(request, "scrum/videos.html", {"equips": equips})
+
+
 @login_required
 def els_meus_equips(request):
     equips = (
@@ -870,6 +1063,56 @@ def els_meus_equips(request):
     return render(request, "scrum/equips_list.html", {"equips": equips})
 
 
+def _normalitza_enllac_video(valor, errors):
+    if valor and "://" not in valor:
+        valor = "https://" + valor
+    if valor:
+        try:
+            URLValidator(schemes=["http", "https"])(valor)
+        except ValidationError:
+            errors.append("L'enllaç del vídeo no és una URL vàlida.")
+    return valor
+
+
+def _valida_dades_equip(request, projectes, equip=None):
+    dades = {
+        "nom": request.POST.get("nom", "").strip(),
+        "descripcio": request.POST.get("descripcio", "").strip(),
+        "link_video": request.POST.get("link_video", "").strip(),
+        "projecte": request.POST.get("projecte", "").strip(),
+    }
+    errors = []
+    dades["link_video"] = _normalitza_enllac_video(
+        dades["link_video"], errors
+    )
+
+    projecte = None
+    if dades["projecte"].isdigit():
+        projecte = projectes.filter(pk=dades["projecte"]).first()
+    if projecte is None:
+        errors.append("Tria un projecte vàlid.")
+
+    if not dades["nom"]:
+        errors.append("El nom de l'equip és obligatori.")
+    elif projecte:
+        equips_amb_nom = Equip.objects.filter(
+            projecte=projecte, nom__iexact=dades["nom"]
+        )
+        if equip is not None:
+            equips_amb_nom = equips_amb_nom.exclude(pk=equip.pk)
+        if equips_amb_nom.exists():
+            errors.append("Ja existeix un equip amb aquest nom en aquest projecte.")
+
+    membres_ids = []
+    for valor in request.POST.getlist("membres"):
+        try:
+            membres_ids.append(int(valor))
+        except (TypeError, ValueError):
+            continue
+
+    return dades, projecte, membres_ids, errors
+
+
 @login_required
 def crea_equip(request):
     projectes = (
@@ -877,35 +1120,26 @@ def crea_equip(request):
         .select_related("centre")
         .order_by("nom")
     )
-    dades = {"nom": "", "descripcio": "", "projecte": ""}
+    dades = {"nom": "", "descripcio": "", "link_video": "", "projecte": ""}
     errors = []
+    membres_seleccionats = []
 
     if request.method == "POST":
-        dades["nom"] = request.POST.get("nom", "").strip()
-        dades["descripcio"] = request.POST.get("descripcio", "").strip()
-        dades["projecte"] = request.POST.get("projecte", "").strip()
-        membres_ids = request.POST.getlist("membres")
-
-        projecte = None
-        if dades["projecte"].isdigit():
-            projecte = projectes.filter(pk=dades["projecte"]).first()
-        if projecte is None:
-            errors.append("Tria un projecte vàlid.")
-
-        if not dades["nom"]:
-            errors.append("El nom de l'equip és obligatori.")
-        elif projecte and Equip.objects.filter(
-            projecte=projecte, nom__iexact=dades["nom"]
-        ).exists():
-            errors.append("Ja existeix un equip amb aquest nom en aquest projecte.")
+        dades, projecte, membres_ids, errors = _valida_dades_equip(
+            request, projectes
+        )
+        membres_seleccionats = list(
+            User.objects.filter(pk__in=membres_ids).order_by("email")
+        )
 
         if not errors:
             equip = Equip.objects.create(
                 nom=dades["nom"],
                 descripcio=dades["descripcio"],
+                link_video=dades["link_video"],
                 projecte=projecte,
             )
-            equip.membres.set(User.objects.filter(pk__in=membres_ids))
+            equip.membres.set(membres_seleccionats)
             equip.membres.add(request.user)
             messages.success(
                 request, "Equip «{}» creat correctament.".format(equip.nom)
@@ -915,7 +1149,69 @@ def crea_equip(request):
     return render(
         request,
         "scrum/equip_form.html",
-        {"projectes": projectes, "dades": dades, "errors": errors},
+        {
+            "projectes": projectes,
+            "dades": dades,
+            "errors": errors,
+            "membres_seleccionats": membres_seleccionats,
+        },
+    )
+
+
+@login_required
+def edita_equip(request, id):
+    equip = get_object_or_404(
+        Equip.objects.select_related("projecte").prefetch_related("membres"),
+        pk=id,
+        membres=request.user,
+    )
+    projectes_permesos = _projectes_per_crear_equip(request.user).values("pk")
+    projectes = (
+        Projecte.objects.filter(
+            Q(pk=equip.projecte_id) | Q(pk__in=projectes_permesos)
+        )
+        .select_related("centre")
+        .order_by("nom")
+    )
+    dades = {
+        "nom": equip.nom,
+        "descripcio": equip.descripcio,
+        "link_video": equip.link_video,
+        "projecte": str(equip.projecte_id),
+    }
+    errors = []
+    membres_seleccionats = list(equip.membres.order_by("email"))
+
+    if request.method == "POST":
+        dades, projecte, membres_ids, errors = _valida_dades_equip(
+            request, projectes, equip
+        )
+        membres_seleccionats = list(
+            User.objects.filter(pk__in=membres_ids).order_by("email")
+        )
+
+        if not errors:
+            equip.nom = dades["nom"]
+            equip.descripcio = dades["descripcio"]
+            equip.link_video = dades["link_video"]
+            equip.projecte = projecte
+            equip.save()
+            equip.membres.set(membres_seleccionats)
+            messages.success(
+                request, "Equip «{}» actualitzat correctament.".format(equip.nom)
+            )
+            return redirect("els_meus_equips")
+
+    return render(
+        request,
+        "scrum/equip_form.html",
+        {
+            "equip": equip,
+            "projectes": projectes,
+            "dades": dades,
+            "errors": errors,
+            "membres_seleccionats": membres_seleccionats,
+        },
     )
 
 
@@ -1148,14 +1444,33 @@ def _spec_data(spec):
         "nom": spec.nom,
         "descripcio": spec.descripcio,
         "hores_estimades": spec.hores_estimades,
-        "mp": [{"id": mp.id, "nom": mp.nom} for mp in spec.mp.all()],
+        "mp": [
+        {"id": mp.id, "numero": mp.numero, "nom": mp.nom}
+        for mp in spec.mp.all()
+    ],
     }
 
 
 def _done_spec_data(done_spec):
+    percentatges_individuals = {
+        percentatge.mp_id: percentatge.percentatge
+        for percentatge in done_spec.percentatges_mp.all()
+    }
     return {
         "id": done_spec.id,
         "percentatge": done_spec.percentatge,
+        "qualificacio_individual": done_spec.qualificacio_individual,
+        "percentatges_mp": [
+            {
+                "id": mp.id,
+                "numero": mp.numero,
+                "nom": mp.nom,
+                "percentatge": percentatges_individuals.get(
+                    mp.id, done_spec.percentatge
+                ),
+            }
+            for mp in done_spec.spec.mp.all()
+        ],
         "ordre": done_spec.ordre,
         "spec": _spec_data(done_spec.spec),
     }
@@ -1269,8 +1584,78 @@ def set_percentatge_done_spec(request, done_spec_id):
             {"status": "ERROR", "message": "El percentatge ha d'estar entre 0 i 100."},
             status=400,
         )
-    done_spec.percentatge = percentatge
-    done_spec.save(update_fields=["percentatge"])
+    with transaction.atomic():
+        done_spec.percentatges_mp.all().delete()
+        done_spec.percentatge = percentatge
+        done_spec.qualificacio_individual = False
+        done_spec.save(
+            update_fields=["percentatge", "qualificacio_individual"]
+        )
+    return JsonResponse({"status": "OK", "done_spec": _done_spec_data(done_spec)})
+
+
+@login_required
+@require_POST
+def set_percentatges_done_spec_mp(request, done_spec_id):
+    done_spec = get_object_or_404(DoneSpec, pk=done_spec_id)
+    if not _pot_gestionar(request.user, done_spec.spec.projecte):
+        return JsonResponse(
+            {"status": "ERROR", "message": "Falten permisos."}, status=403
+        )
+
+    mps = list(done_spec.spec.mp.all())
+    if not mps:
+        return JsonResponse(
+            {
+                "status": "ERROR",
+                "message": "Aquesta spec no té mòduls professionals.",
+            },
+            status=400,
+        )
+
+    existents = {
+        percentatge.mp_id: percentatge.percentatge
+        for percentatge in done_spec.percentatges_mp.all()
+    }
+    valors = {}
+    for mp in mps:
+        valor = request.POST.get("mp_{}".format(mp.id))
+        if valor is None:
+            valors[mp.id] = existents.get(mp.id, done_spec.percentatge)
+            continue
+        try:
+            percentatge = float(valor)
+        except (TypeError, ValueError):
+            return JsonResponse(
+                {"status": "ERROR", "message": "Percentatge no vàlid."},
+                status=400,
+            )
+        if not 0 <= percentatge <= 100:
+            return JsonResponse(
+                {
+                    "status": "ERROR",
+                    "message": "El percentatge ha d'estar entre 0 i 100.",
+                },
+                status=400,
+            )
+        valors[mp.id] = percentatge
+
+    with transaction.atomic():
+        for mp in mps:
+            DoneSpecPercentatgeMP.objects.update_or_create(
+                done_spec=done_spec,
+                mp=mp,
+                defaults={"percentatge": valors[mp.id]},
+            )
+        DoneSpecPercentatgeMP.objects.filter(done_spec=done_spec).exclude(
+            mp__in=mps
+        ).delete()
+        done_spec.percentatge = sum(valors.values()) / len(valors)
+        done_spec.qualificacio_individual = True
+        done_spec.save(
+            update_fields=["percentatge", "qualificacio_individual"]
+        )
+
     return JsonResponse({"status": "OK", "done_spec": _done_spec_data(done_spec)})
 
 

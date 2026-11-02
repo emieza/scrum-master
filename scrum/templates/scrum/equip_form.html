@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Nou equip · Scrum Master{% endblock %}
+{% block title %}{% if equip %}Edita l'equip{% else %}Nou equip{% endif %} · Scrum Master{% endblock %}
 
 {% block extra_css %}
 .membres-seleccionats {
@@ -18,9 +18,13 @@
 {% block content %}
 <div class="container">
   <div class="section">
-    <h2>Nou equip</h2>
+    <h2>{% if equip %}Edita l'equip{% else %}Nou equip{% endif %}</h2>
     <p class="grey-text">
-      Crea un equip per a un projecte i afegeix-ne els membres cercant-los pel correu electrònic.
+      {% if equip %}
+        Modifica les dades de l'equip i gestiona'n els membres cercant-los pel correu electrònic.
+      {% else %}
+        Crea un equip per a un projecte i afegeix-ne els membres cercant-los pel correu electrònic.
+      {% endif %}
     </p>
 
     {% if errors %}
@@ -59,8 +63,22 @@
           <label for="descripcio" {% if dades.descripcio %}class="active"{% endif %}>Descripció (opcional)</label>
         </div>
 
+        <div class="input-field">
+          <input type="text" inputmode="url" name="link_video" id="link_video" value="{{ dades.link_video }}" maxlength="500">
+          <label for="link_video" {% if dades.link_video %}class="active"{% endif %}>Enllaç del vídeo (opcional)</label>
+          <span class="helper-text">Pot ser un enllaç de YouTube o d'una altra plataforma.</span>
+        </div>
+
         <h5>Membres</h5>
-        <div id="membres-seleccionats" class="membres-seleccionats"></div>
+        <div id="membres-seleccionats" class="membres-seleccionats">
+          {% for membre in membres_seleccionats %}
+            <div class="chip">
+              {{ membre.email }}
+              <input type="hidden" name="membres" value="{{ membre.id }}">
+              <i class="close material-icons" role="button" aria-label="Treu {{ membre.email }}">close</i>
+            </div>
+          {% endfor %}
+        </div>
 
         <div class="input-field">
           <input type="text" id="cerca-email" autocomplete="off" inputmode="email">
@@ -72,7 +90,11 @@
         <ul id="cerca-resultats" class="collection" style="display: none;"></ul>
 
         <button class="btn waves-effect waves-light" type="submit">
-          <i class="material-icons left">group_add</i>Crea l'equip
+          {% if equip %}
+            <i class="material-icons left">save</i>Desa els canvis
+          {% else %}
+            <i class="material-icons left">group_add</i>Crea l'equip
+          {% endif %}
         </button>
       </form>
     {% else %}
@@ -98,6 +120,12 @@
     var ajudaBase = ajuda.textContent.trim();
     var temporitzador = null;
     var peticio = 0;
+
+    seleccionats.addEventListener("click", function (event) {
+      if (event.target.classList.contains("close")) {
+        event.target.closest(".chip").remove();
+      }
+    });
 
     function netejaResultats() {
       resultats.innerHTML = "";
@@ -125,9 +153,6 @@
         close.textContent = "close";
         close.setAttribute("role", "button");
         close.setAttribute("aria-label", "Treu " + usuari.email);
-        close.addEventListener("click", function () {
-          chip.remove();
-        });
         chip.appendChild(close);
 
         seleccionats.appendChild(chip);
