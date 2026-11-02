@@ -32,15 +32,19 @@ class Command(BaseCommand):
             defaults={"descripcio": "Família professional d'informàtica."},
         )
 
-        cicle, _ = Cicle.objects.get_or_create(
-            codi="DAW",
-            defaults={
-                "nom": "Desenvolupament d'aplicacions web",
-                "grau": "CFGS",
-                "familia": familia,
-                "descripcio": "Cicle formatiu de grau superior de desenvolupament web.",
-            },
-        )
+        cicle = Cicle.objects.filter(
+            nom__iexact="Desenvolupament d'aplicacions web"
+        ).first()
+        if cicle is None:
+            cicle, _ = Cicle.objects.get_or_create(
+                codi="DAW",
+                defaults={
+                    "nom": "Desenvolupament d'aplicacions web",
+                    "grau": "CFGS",
+                    "familia": familia,
+                    "descripcio": "Cicle formatiu de grau superior de desenvolupament web.",
+                },
+            )
 
         centre, _ = Centre.objects.get_or_create(
             nom="Institut Esteve Terradas i Illa",
