@@ -8,12 +8,13 @@
 .comment-box { border-bottom: 1px solid #cfd8dc; }
 .comment-form, .comment-container { display: none; }
 .anchor { color: #000; }
+.back-link { display: flow-root; }
 {% endblock %}
 
 {% block content %}
 <div class="container">
   <div class="section">
-    <div>
+    <div class="back-link">
       <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
     </div>
 
@@ -98,7 +99,7 @@
       </ul>
     {% endif %}
 
-    <div>
+    <div class="back-link">
       <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
     </div>
   </div>
