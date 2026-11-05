@@ -11,6 +11,7 @@ from odf.opendocument import load
 from odf.table import Table, TableCell, TableRow
 
 from .adapters import SocialAccountAdapter
+from .forms import ProjecteDescripcioForm, SpecDescripcioForm
 from .management.commands.seed_projectes_antics import Command as SeedCommand
 from .models import (
     Categoria,
@@ -26,6 +27,7 @@ from .models import (
     Sprint,
     User,
 )
+from .widgets import Base64CKEditor5Widget
 
 
 def _llegeix_ods(contingut):
@@ -1015,6 +1017,7 @@ class ScrumTests(TestCase):
         self.assertContains(response, "django_ckeditor_5")
         self.assertContains(response, "django_ckeditor_5/dist/bundle.js")
         self.assertContains(response, "django_ckeditor_5/dist/styles.css")
+        self.assertContains(response, "js/ckeditor_base64_upload.js")
 
     def test_descripcions_amb_editor_enriquit(self):
         self.assertIsInstance(
@@ -1025,6 +1028,15 @@ class ScrumTests(TestCase):
             Spec._meta.get_field("descripcio").formfield().widget,
             CKEditor5Widget,
         )
+
+    def test_descripcions_incrusten_imatges_en_base64(self):
+        for formulari in (ProjecteDescripcioForm, SpecDescripcioForm):
+            form = formulari()
+            self.assertIsInstance(
+                form.fields["descripcio"].widget,
+                Base64CKEditor5Widget,
+            )
+            self.assertIn("js/ckeditor_base64_upload.js", form.media._js)
 
     def test_autocomplete_sprints_filtrat_per_projecte(self):
         self.user.is_staff = True

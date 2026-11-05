@@ -6,6 +6,7 @@ from django.contrib.admin.widgets import AutocompleteSelectMultiple
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.db.models import Q
 from django.utils.safestring import mark_safe
+from django_ckeditor_5.fields import CKEditor5Field
 
 from .models import (
     Categoria,
@@ -21,6 +22,7 @@ from .models import (
     Sprint,
     User,
 )
+from .widgets import Base64CKEditor5Widget
 
 
 def _parent_id(request, segment):
@@ -64,6 +66,7 @@ class SpecInline(SortableStackedInline):
     fields = ("nom", "ordre", "mp", "hores_estimades", "sprints", "descripcio")
     autocomplete_fields = ("mp", "sprints")
     ordering = ("ordre",)
+    formfield_overrides = {CKEditor5Field: {"widget": Base64CKEditor5Widget}}
 
     def formfield_for_manytomany(self, db_field, request, **kwargs):
         projecte_id = _parent_id(request, "projecte")
@@ -98,6 +101,7 @@ class SpecInline(SortableStackedInline):
 
 class ProjecteAdmin(SortableAdminBase, admin.ModelAdmin):
     model = Projecte
+    formfield_overrides = {CKEditor5Field: {"widget": Base64CKEditor5Widget}}
 
     class Media:
         css = {"all": ("css/admin_collapse_specs.css",)}
