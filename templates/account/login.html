@@ -19,7 +19,7 @@
           <form method="post" action="{% url 'account_login' %}">
             {% csrf_token %}
             <div class="input-field">
-              <input type="email" name="{{ form.login.html_name }}" id="{{ form.login.id_for_label }}" value="{{ form.login.value|default_if_none:'' }}" autocomplete="email" required autofocus>
+              <input type="email" name="{{ form.login.html_name }}" id="{{ form.login.id_for_label }}" value="{{ form.login.value|default_if_none:'' }}" autocomplete="email" required>
               <label for="{{ form.login.id_for_label }}" class="active">Correu electrònic</label>
               {% for error in form.login.errors %}<span class="red-text">{{ error }}</span>{% endfor %}
             </div>
@@ -47,4 +47,22 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var email = document.getElementById("{{ form.login.id_for_label }}");
+    if (!email) { return; }
+    function focusEmailOnFirstTab(event) {
+      if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) { return; }
+      var active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) { return; }
+      event.preventDefault();
+      email.focus();
+      document.removeEventListener("keydown", focusEmailOnFirstTab, true);
+    }
+    document.addEventListener("keydown", focusEmailOnFirstTab, true);
+  })();
+</script>
 {% endblock %}
