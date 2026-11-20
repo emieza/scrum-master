@@ -1,0 +1,141 @@
+/* Gives the Django admin the same look as the public site.
+   It only redefines the admin's own colour variables and a few rules that
+   those variables cannot reach; the admin's layout is left untouched.
+   The admin is shown in light mode only, like the rest of the site. */
+
+html[data-theme="light"],
+:root {
+  --primary: #1f2937;
+  --secondary: #1f2937;
+  --accent: #1f2937;
+  --primary-fg: #ffffff;
+
+  --body-fg: #1f2933;
+  --body-bg: #ffffff;
+  --body-quiet-color: #5f6b7a;
+  --body-medium-color: #3d4852;
+  --body-loud-color: #111827;
+
+  /* Dark bar + white text stay paired wherever the admin uses them
+     (widgets, calendars, the login box); the page header and the module
+     captions are restyled below. */
+  --header-color: #e5e7eb;
+  --header-branding-color: #ffffff;
+  --header-bg: #1f2937;
+  --header-link-color: #ffffff;
+
+  --breadcrumbs-fg: #5f6b7a;
+  --breadcrumbs-link-fg: #5f6b7a;
+  --breadcrumbs-bg: #f6f7f9;
+
+  --link-fg: #1d4ed8;
+  --link-hover-color: #1e3a8a;
+  --link-selected-fg: #1f2937;
+
+  --hairline-color: #d5dae1;
+  --border-color: #bcc3cd;
+
+  --error-fg: #b91c1c;
+
+  --message-success-bg: #ecfdf3;
+  --message-warning-bg: #fff3e6;
+  --message-error-bg: #fef2f2;
+
+  --darkened-bg: #f6f7f9;
+  --selected-bg: #eaf1fe;
+  --selected-row: #eaf1fe;
+
+  --button-fg: #ffffff;
+  --button-bg: #1f2937;
+  --button-hover-bg: #111827;
+  --default-button-bg: #1f2937;
+  --default-button-hover-bg: #111827;
+  --close-button-bg: #5f6b7a;
+  --close-button-hover-bg: #3d4852;
+  --delete-button-bg: #b91c1c;
+  --delete-button-hover-bg: #991b1b;
+
+  --object-tools-fg: #ffffff;
+  --object-tools-bg: #1f2937;
+  --object-tools-hover-bg: #111827;
+
+  --font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  color-scheme: light;
+}
+
+/* ---- Top bar: white, like the site's ---------------------------------- */
+
+#header {
+  background: #ffffff;
+  color: #5f6b7a;
+  border-bottom: 1px solid #d5dae1;
+  min-height: 56px;
+  align-items: center;
+}
+#header a:link, #header a:visited, #logout-form button { color: #1f2933; }
+#header a:hover, #logout-form button:hover { color: #1d4ed8; }
+#site-name { font-size: 1rem; font-weight: 600; margin: 0; }
+#site-name a:link, #site-name a:visited {
+  display: inline-flex; align-items: center; gap: 10px; color: #1f2933;
+}
+#site-name img { width: 24px; height: 24px; }
+#user-tools { text-transform: none; font-size: 0.875rem; letter-spacing: 0; }
+.theme-toggle { display: none; }
+
+div.breadcrumbs { border-bottom: 1px solid #d5dae1; }
+div.breadcrumbs a:hover { color: #1f2933; }
+
+/* The login screen keeps a dark bar, so its title needs light text. */
+.login #header { background: #1f2937; border-bottom: 0; }
+.login #site-name a:link, .login #site-name a:visited { color: #ffffff; }
+
+/* ---- Module captions: quiet grey instead of a coloured bar ------------- */
+
+/* "body" in front raises the weight of these rules above the admin's own
+   page stylesheets (forms.css, changelists.css…), which load after this file. */
+body .module h2, body .module caption, body .inline-group h2,
+body fieldset.module h2.inline-heading,
+body #nav-sidebar .module th, body #nav-sidebar .module caption {
+  background: #dfe5ec;
+  color: #1f2933;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+body .module caption a.section:link, body .module caption a.section:visited,
+body a.section:link, body a.section:visited,
+body #nav-sidebar .current-app .section:link,
+body #nav-sidebar .current-app .section:visited { color: #1f2933; }
+body #nav-sidebar .current-app .section:link { font-weight: 700; }
+.module, .inline-group .tabular fieldset.module { border-radius: 8px; }
+.dashboard .module, #changelist .changelist-form-container, .inline-group {
+  border: 1px solid #d5dae1; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.06);
+}
+
+/* ---- Controls ---------------------------------------------------------- */
+
+.button, input[type='submit'], input[type='button'], .submit-row input,
+a.button, .object-tools a, a.addlink.button {
+  border-radius: 6px;
+}
+body .object-tools a:link, body .object-tools a:visited {
+  text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 0.8125rem;
+}
+body #logout-form button { text-transform: none; letter-spacing: 0; font-size: inherit; }
+body .button, body input[type='submit'], body input[type='button'], body .submit-row input, body a.button {
+  text-transform: none; letter-spacing: 0;
+}
+input[type='text'], input[type='password'], input[type='email'], input[type='url'],
+input[type='number'], input[type='tel'], input[type='date'], input[type='search'],
+textarea, select, .vTextField {
+  border-color: #8a94a3;
+  border-radius: 6px;
+}
+.submit-row { border-radius: 8px; }
+ul.messagelist li { border-radius: 6px; margin: 0 0 8px; }
+thead th { background: #dfe5ec; }
+
+:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+body .button.default, body input[type='submit'].default, body .submit-row input.default { text-transform: none; }

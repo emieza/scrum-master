@@ -1,91 +1,44 @@
 {% extends "base.html" %}
+{% load icons %}
 
 {% block title %}Els meus equips · Scrum Master{% endblock %}
 
-{% block extra_css %}
-.equip-capcalera {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.equip-capcalera .card-title {
-  margin: 0;
-}
-
-.equip-accions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-left: auto;
-}
-
-.equip-accions .btn {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.equip-accions .btn .material-icons {
-  float: none;
-  margin-right: 0.35rem;
-  font-size: 1.1rem;
-}
-{% endblock %}
-
 {% block content %}
-<div class="container">
-  <div class="section">
-    <div class="row valign-wrapper">
-      <div class="col s12 m8">
-        <h2>Els meus equips</h2>
-        <p class="grey-text">Equips dels quals formes part.</p>
-      </div>
-      <div class="col s12 m4 right-align">
-        <a class="btn waves-effect waves-light" href="{% url 'crea_equip' %}">
-          <i class="material-icons left">group_add</i>Crea equip
-        </a>
-      </div>
-    </div>
+<div class="page-header">
+  <div class="titles">
+    <h1>Els meus equips</h1>
+    <p class="muted">Equips dels quals formes part.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="{% url 'crea_equip' %}">{% icon "user-plus" %}Crea equip</a>
+  </div>
+</div>
 
-    {% for equip in equips %}
-      <div class="card">
-        <div class="card-content">
-          <div class="equip-capcalera">
-            <span class="card-title">{{ equip.nom }}</span>
-            <div class="equip-accions">
-              <a class="btn waves-effect waves-light" href="{% url 'projecte' equip.projecte.id %}">
-                <i class="material-icons left">visibility</i>Anar al projecte
-              </a>
-              <a class="btn waves-effect waves-light teal" href="{% url 'edita_equip' equip.id %}">
-                <i class="material-icons left">edit</i>Editar equip
-              </a>
-            </div>
-          </div>
-          <p class="grey-text">
-            {{ equip.projecte.nom }}
-            {% if equip.projecte.centre %}· {{ equip.projecte.centre }}{% endif %}
-          </p>
-          {% if equip.descripcio %}
-            <p>{{ equip.descripcio }}</p>
-          {% endif %}
-          <div class="chips">
-            {% for membre in equip.membres.all %}
-              <div class="chip">
-                {{ membre.nom_complert|default:membre.email }}
-              </div>
-            {% endfor %}
-          </div>
+<div class="stack">
+  {% for equip in equips %}
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">{{ equip.nom }}</h2>
+        <div class="btn-row">
+          <a class="btn small" href="{% url 'projecte' equip.projecte.id %}">{% icon "eye" %}Anar al projecte</a>
+          <a class="btn small" href="{% url 'edita_equip' equip.id %}">{% icon "edit" %}Editar equip</a>
         </div>
       </div>
-    {% empty %}
-      <div class="card-panel">
-        Encara no formes part de cap equip.
+      <p class="muted">
+        {{ equip.projecte.nom }}
+        {% if equip.projecte.centre %}· {{ equip.projecte.centre }}{% endif %}
+      </p>
+      {% if equip.descripcio %}
+        <p>{{ equip.descripcio }}</p>
+      {% endif %}
+      <div class="chips">
+        {% for membre in equip.membres.all %}
+          <span class="chip">{{ membre.nom_complert|default:membre.email }}</span>
+        {% endfor %}
       </div>
-    {% endfor %}
-  </div>
+    </div>
+  {% empty %}
+    <div class="empty">Encara no formes part de cap equip.</div>
+  {% endfor %}
 </div>
 {% endblock %}

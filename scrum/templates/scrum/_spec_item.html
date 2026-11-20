@@ -1,74 +1,60 @@
-{% load scrum_extras %}
+{% load scrum_extras icons %}
 {% with clau=sprint_id|default:"backlog" %}
-  <li class="collection-item">
-    <h6 style="font-weight: bold;">
-      <a class="anchor" id="sprint-{{ clau }}-spec-{{ spec.id }}">
-        {{ spec.ordre }}. {{ spec.nom }}
-      </a>
-    </h6>
+  <li class="spec-item">
+    <h3 id="sprint-{{ clau }}-spec-{{ spec.id }}">{{ spec.ordre }}. {{ spec.nom }}</h3>
     <div class="rich-text">{{ spec.descripcio|safe }}</div>
-    <div>
-      <p>
-        <span>Hores estimades: {{ spec.hores_estimades }}</span>
-        <span style="margin-left: 1.5rem;">Mòduls:</span>
+    <div class="meta">
+      <span>Hores estimades: {{ spec.hores_estimades }}</span>
+      <span>Mòduls:</span>
+      <span class="chips">
         {% for mp in spec.mp.all %}
           <span class="chip">{{ mp }}</span>
         {% endfor %}
-      </p>
+      </span>
     </div>
 
     {% if activa_comentaris %}
       <div class="comments">
         {% if spec.feedbacks|compte_dels_grups_de:request.user > 0 %}
-          <p style="cursor:pointer;" onclick="toggle_read_comment('{{ clau }}',{{ spec.id }})">
-            <i class="material-icons left">comment</i>Llegir comentaris
-          </p>
-          <div class="comment-container" id="comment-container-{{ clau }}-{{ spec.id }}">
+          <button type="button" class="btn small ghost" data-toggle="comment-container"
+                  aria-expanded="false" aria-controls="comment-container-{{ clau }}-{{ spec.id }}"
+                  onclick="toggle_read_comment('{{ clau }}',{{ spec.id }})">
+            {% icon "comment" %}Llegir comentaris
+          </button>
+          <div class="comment-container" id="comment-container-{{ clau }}-{{ spec.id }}" hidden>
             {% for coment in spec.feedbacks|dels_grups_de:request.user %}
-              <div class="comment-box row">
-                <div class="row">
-                  <div class="col s4">
-                    <i class="material-icons tiny">alarm</i>
-                    {{ coment.hores }} hores reals
-                  </div>
-                  <div class="col s4">
-                    <i class="material-icons tiny">person</i>
-                    {{ coment.usuari }}
-                  </div>
-                  <div class="col s4">
-                    <i class="material-icons tiny">people</i>
-                    {{ coment.equip|default:"—" }}
-                  </div>
+              <div class="comment-box">
+                <div class="meta">
+                  <span>{% icon "clock" %}{{ coment.hores }} hores reals</span>
+                  <span>{% icon "user" %}{{ coment.usuari }}</span>
+                  <span>{% icon "users" %}{{ coment.equip|default:"—" }}</span>
                 </div>
-                <div class="row">
-                  <div class="col s12">
-                    <i class="material-icons tiny">comment_bank</i>
-                    <div>{{ coment.desc|safe }}</div>
-                  </div>
-                </div>
+                <div class="rich-text">{{ coment.desc|safe }}</div>
               </div>
             {% endfor %}
           </div>
         {% endif %}
 
         {% if not request.user.es_profe and not request.user.is_superuser %}
-          <p style="cursor:pointer;" onclick="toggle_add_comment('{{ clau }}',{{ spec.id }})">
-            <i class="material-icons left">read_more</i>Afegir comentari
-          </p>
-          <div class="comment-form row" id="comment-form-{{ clau }}-{{ spec.id }}">
+          <button type="button" class="btn small ghost" data-toggle="comment-form"
+                  aria-expanded="false" aria-controls="comment-form-{{ clau }}-{{ spec.id }}"
+                  onclick="toggle_add_comment('{{ clau }}',{{ spec.id }})">
+            {% icon "plus" %}Afegir comentari
+          </button>
+          <div class="comment-form" id="comment-form-{{ clau }}-{{ spec.id }}" hidden>
             <form method="post" action="{% url 'projecte' projecte.id %}#sprint-{{ clau }}-spec-{{ spec.id }}">
               {% csrf_token %}
               <input type="hidden" name="sprint_id" value="{{ sprint_id|default:'' }}">
               <input type="hidden" name="spec_id" value="{{ spec.id }}">
-              <div class="input-field col s6 m3">
-                <input type="number" step="0.5" name="hores" id="hores-{{ clau }}-{{ spec.id }}" required>
+              <div class="field">
                 <label for="hores-{{ clau }}-{{ spec.id }}">Hores reals</label>
+                <input class="input" type="number" step="0.5" name="hores" id="hores-{{ clau }}-{{ spec.id }}" required>
               </div>
-              <div class="input-field col s12 m9">
-                <textarea name="desc" id="desc-{{ clau }}-{{ spec.id }}" class="materialize-textarea" required></textarea>
+              <div class="field">
                 <label for="desc-{{ clau }}-{{ spec.id }}">Comentari</label>
+                <textarea class="input" name="desc" id="desc-{{ clau }}-{{ spec.id }}" required></textarea>
               </div>
-              <button class="btn waves-effect waves-light" type="submit">Envia comentari</button>
+              <button class="btn primary" type="submit">Envia comentari</button>
             </form>
           </div>
         {% endif %}

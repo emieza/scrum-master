@@ -5,43 +5,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Scrum Master · Portal de projectes{% endblock %}</title>
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
-  <style>
-    .navbar-fixed { z-index: 999; }
-    .success { background-color: #ccfacc; }
-    .brand-logo { font-size: 1.5rem !important; }
-    {% block extra_css %}{% endblock %}
-  </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body>
+  <a class="skip-link" href="#main">Ves al contingut</a>
   {% include "scrum/navbar.html" %}
 
-  <main>
+  <main id="main" class="main {% block main_class %}{% endblock %}">
     {% if messages %}
-      <div class="container" style="margin-top: 1rem;">
-        {% for message in messages %}
-          <div class="card-panel {% if message.tags == 'success' %}green lighten-4{% elif message.tags == 'error' %}red lighten-4{% else %}blue lighten-4{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      </div>
+      {% for message in messages %}
+        <div class="notice {% if message.tags == 'success' %}success{% elif message.tags == 'error' %}error{% endif %}" role="status">
+          {{ message }}
+        </div>
+      {% endfor %}
     {% endif %}
 
+    {% block content_open %}{% endblock %}
     {% block content %}{% endblock %}
+    {% block content_close %}{% endblock %}
   </main>
 
   {% include "scrum/footer.html" %}
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      M.AutoInit();
-    });
-  </script>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+  <script src="{% static 'js/ui.js' %}"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

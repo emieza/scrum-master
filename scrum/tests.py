@@ -215,7 +215,7 @@ class ScrumTests(TestCase):
         )
         self.assertContains(
             response,
-            "btn btn-small waves-effect waves-light modal-trigger",
+            'data-modal-open="modal-clonar"',
         )
 
     def test_nom_per_defecte_de_clon_evita_colisions(self):
@@ -639,7 +639,7 @@ class ScrumTests(TestCase):
             reverse("qualifica_projecte", args=[self.projecte.id])
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "modal.options.onCloseEnd = recarrega_vista")
+        self.assertContains(response, 'UI.openModal(document.getElementById("modal1"), recarrega_vista)')
         self.assertContains(response, "function recarrega_vista")
         self.assertContains(response, "desamentsPendents")
         self.assertContains(response, "window.location.reload()")
@@ -1756,13 +1756,13 @@ class ScrumTests(TestCase):
         self.assertContains(response, reverse("cerca_sprints"))
         self.assertContains(
             response,
-            '<h3 id="projecte-nom">{}</h3>'.format(self.projecte.nom),
+            '<h2 id="projecte-nom">{}</h2>'.format(self.projecte.nom),
             html=True,
         )
         contingut = response.content.decode()
         self.assertLess(
-            contingut.index("<h4>Sprints</h4>"),
-            contingut.index("<h4>Specs</h4>"),
+            contingut.index("<h2>Sprints</h2>"),
+            contingut.index("<h2>Specs</h2>"),
         )
 
     def test_edita_projecte_mostra_la_descripcio_de_les_specs_col_lapsada(self):
@@ -1803,7 +1803,7 @@ class ScrumTests(TestCase):
         )
         self.assertContains(
             response,
-            'class="btn-small waves-effect waves-light blue spec-edita"',
+            'class="btn small spec-edita"',
         )
         self.assertContains(response, 'data-spec-nom="Spec amb descripció"')
         self.assertContains(

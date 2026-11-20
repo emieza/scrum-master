@@ -1,5 +1,7 @@
+{% load icons %}
 {% if specs %}
-  <table class="striped specs-table responsive-table">
+  <div class="table-wrap">
+  <table class="table specs-table">
     <thead>
       <tr>
         <th>Ordre</th>
@@ -21,9 +23,7 @@
             data-spec-descripcio-html="{{ spec.descripcio }}"
             draggable="true">
           <td>
-            <span class="spec-drag-handle" title="Arrossega per reordenar">
-              <i class="material-icons" aria-hidden="true">drag_indicator</i>
-            </span>
+            <span class="spec-drag-handle" title="Arrossega per reordenar">{% icon "grip" %}</span>
             {{ spec.ordre }}
           </td>
           <td>{{ spec.nom }}</td>
@@ -47,11 +47,11 @@
           <td>{{ spec.show_sprints|default:"—" }}</td>
           <td class="spec-accions">
             <button type="button"
-                    class="btn-small waves-effect waves-light blue spec-edita"
+                    class="btn small spec-edita"
                     draggable="false"
                     title="Edita la spec"
                     aria-label="Edita {{ spec.nom }}">
-              <i class="material-icons left" aria-hidden="true">edit</i>Edita
+              {% icon "edit" %}Edita
             </button>
             <span class="spec-dades" hidden>
               {% for mp in spec.mp.all %}
@@ -77,6 +77,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% else %}
-  <p>Encara no hi ha cap spec en aquest projecte.</p>
+  <p class="empty">Encara no hi ha cap spec en aquest projecte.</p>
 {% endif %}
