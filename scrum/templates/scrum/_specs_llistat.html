@@ -20,8 +20,7 @@
             data-spec-nom="{{ spec.nom }}"
             data-spec-ordre="{{ spec.ordre }}"
             data-spec-hores="{{ spec.hores_estimades|stringformat:'g' }}"
-            data-spec-descripcio-html="{{ spec.descripcio }}"
-            draggable="true">
+            data-spec-descripcio-html="{{ spec.descripcio }}">
           <td>
             <span class="spec-drag-handle" title="Arrossega per reordenar">{% icon "grip" %}</span>
             {{ spec.ordre }}
@@ -41,14 +40,12 @@
                    data-original="{{ spec.hores_estimades|stringformat:'g' }}"
                    data-actualitza-hores-url="{% url 'actualitza_hores_spec' spec.id %}"
                    aria-label="Hores estimades de {{ spec.nom }}"
-                   title="Edita les hores estimades"
-                   draggable="false">
+                   title="Edita les hores estimades">
           </td>
           <td>{{ spec.show_sprints|default:"—" }}</td>
           <td class="spec-accions">
             <button type="button"
                     class="btn small spec-edita"
-                    draggable="false"
                     title="Edita la spec"
                     aria-label="Edita {{ spec.nom }}">
               {% icon "edit" %}Edita

@@ -433,15 +433,50 @@ dialog.modal > form { display: flex; flex-direction: column; min-height: 0; flex
 
 #specs-llistat tr.spec-fila-senar > td { background: var(--surface); }
 #specs-llistat tr.spec-fila-parell > td { background: #f7f9fb; }
-#specs-llistat tr.spec-amb-descripcio > td { padding-bottom: 4px; border-bottom: 0; }
-#specs-llistat tr.spec-descripcio-fila > td { padding-top: 0; }
+#specs-llistat tr.spec-amb-descripcio > td, .spec-flotant tr.spec-amb-descripcio > td { padding-bottom: 4px; border-bottom: 0; }
+#specs-llistat tr.spec-descripcio-fila > td, .spec-flotant tr.spec-descripcio-fila > td { padding-top: 0; }
 
-.spec-drag-handle { cursor: grab; color: var(--text-muted); }
-#specs-llistat tr[data-spec-id] { cursor: grab; }
-#specs-llistat tr[data-spec-id]:active { cursor: grabbing; }
-#specs-llistat tr.spec-arrossegada { opacity: 0.45; }
-#specs-llistat tr.spec-drop-abans > td { box-shadow: inset 0 2px 0 var(--focus); }
-#specs-llistat tr.spec-drop-apres > td { box-shadow: inset 0 -2px 0 var(--focus); }
+/* The handle a spec is dragged by. A bigger target than the dots that are
+   drawn, for fingers; the drag is ours, so the browser must not scroll or
+   select text instead. */
+.spec-drag-handle {
+  display: inline-grid; place-items: center; width: 32px; height: 28px; vertical-align: middle;
+  cursor: grab; color: var(--text-muted); border-radius: var(--radius-sm);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.spec-drag-handle:hover { background: var(--surface-muted); color: var(--text); }
+@media (pointer: coarse) {
+  .spec-drag-handle { width: 40px; height: 36px; }
+}
+/* A mouse can also pull a spec by the row itself. */
+#specs-llistat tr[data-spec-id] { cursor: grab; user-select: none; -webkit-user-select: none; }
+/* The copy of the row that follows the pointer: a little bigger, with a deep shadow. */
+.spec-flotant {
+  position: fixed; z-index: 40; margin: 0; pointer-events: none; table-layout: fixed;
+  background: var(--surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+  scale: 1.02; opacity: 0.97;
+}
+.spec-flotant td { border-bottom: 0; }
+/* The carried copy keeps the room of the description row, so it matches the
+   slot, but shows only the spec's own line. */
+.spec-flotant .spec-descripcio { visibility: hidden; }
+/* Dropped: it glides into the slot and settles back to its size. */
+.spec-flotant.settling { scale: 1; box-shadow: var(--shadow-sm); transition: transform 0.17s ease, scale 0.17s ease, box-shadow 0.17s ease; }
+/* While a spec is carried, the others slide out of its way. The sliding is
+   on the cells: every browser moves a table cell, not every one a table row.
+   Borders are per cell (not shared), so they slide with their cell. */
+#specs-llistat .table-wrap { position: relative; }
+#specs-llistat .specs-table { border-collapse: separate; border-spacing: 0; }
+#specs-llistat.sorting td { position: relative; z-index: 1; transform: translateY(var(--desplaca, 0px)); transition: transform 0.18s ease; }
+/* The carried spec itself is shown by its floating copy. */
+#specs-llistat.sorting tr.spec-arrossegada { visibility: hidden; }
+/* The place the carried spec would take, seen under it. */
+.spec-slot {
+  position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none;
+  border: 2px dashed var(--focus); border-radius: var(--radius-sm);
+  background: #dbe7fd; box-shadow: inset 0 2px 8px rgba(37, 99, 235, 0.25);
+  transition: top 0.18s ease;
+}
 
 .spec-hores-input {
   width: 6rem; min-height: 34px; margin: 0; padding: 4px 8px;

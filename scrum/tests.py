@@ -1785,7 +1785,9 @@ class ScrumTests(TestCase):
         self.assertContains(
             response, 'data-spec-id="{}"'.format(spec.id)
         )
-        self.assertContains(response, 'draggable="true"')
+        # Es reordena amb esdeveniments de punter (també en pantalles tàctils).
+        self.assertNotContains(response, 'draggable="true"')
+        self.assertContains(response, "pointerdown")
         self.assertContains(response, 'class="spec-drag-handle"')
         self.assertContains(
             response, 'data-spec-descripcio="{}"'.format(spec.id)

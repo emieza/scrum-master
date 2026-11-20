@@ -752,26 +752,6 @@
       return filesSpec().map(grup);
     }
 
-    function filaSpecPer(element) {
-      var fila = element.closest("tr[data-spec-id]");
-      if (fila) {
-        return fila;
-      }
-      var descripcio = element.closest("tr[data-spec-descripcio]");
-      if (descripcio) {
-        return descripcio.previousElementSibling;
-      }
-      return null;
-    }
-
-    function netejaIndicadors() {
-      contenidor
-        .querySelectorAll(".spec-drop-abans, .spec-drop-apres")
-        .forEach(function (fila) {
-          fila.classList.remove("spec-drop-abans", "spec-drop-apres");
-        });
-    }
-
     function actualitzaZebra() {
       filesSpec().forEach(function (fila, index) {
         var classe =
@@ -870,81 +850,212 @@
         });
     }
 
-    contenidor.addEventListener("dragstart", function (event) {
-      if (event.target.closest(".spec-hores-input")) {
-        event.preventDefault();
+    // ---- Dragging a spec to another position --------------------------------
+    // Done with pointer events, not the browser's own drag and drop, so the
+    // same code serves a mouse, a pen and a finger. A finger drags by the
+    // handle (the dots at the start of the row), which starts at once; a
+    // mouse can also pull the row from anywhere that is not a control.
+    //
+    // A table row cannot be made bigger or given a shadow, so what is carried
+    // is a floating copy of the row. While it is carried the other specs
+    // slide out of its way and a blue slot shows where it would land. The
+    // sliding is done on the cells (through --desplaca), not on the rows:
+    // every browser moves a table cell, which is not true of a table row.
+    var PULL_PX = 5; // Mouse: how far a row is pulled before it lifts.
+    var SIDEWAYS = 0.35; // How much of the sideways movement the copy follows.
+    var SIDEWAYS_MAX = 36;
+    var GLIDE_MS = 170;
+    var drag = null;
+    var pendent = null; // { fila, pointerId, x, y }: a mouse press that may become a drag.
+
+    function esControl(element) {
+      return Boolean(
+        element.closest("input, button, a, select, textarea, summary, label, .ck, .spec-edicio-fila")
+      );
+    }
+
+    function creaFlotant(nodes) {
+      var taula = contenidor.querySelector("table");
+      var caixa = nodes[0].getBoundingClientRect();
+      var flotant = document.createElement("table");
+      flotant.className = taula.className + " spec-flotant";
+      flotant.setAttribute("aria-hidden", "true");
+      var cos = document.createElement("tbody");
+      nodes.forEach(function (node) {
+        var copia = node.cloneNode(true);
+        copia.removeAttribute("data-spec-id");
+        copia.removeAttribute("data-spec-descripcio");
+        // Outside its table a row loses its column widths: keep them.
+        Array.prototype.forEach.call(node.children, function (cella, index) {
+          copia.children[index].style.width = cella.getBoundingClientRect().width + "px";
+        });
+        cos.appendChild(copia);
+      });
+      flotant.appendChild(cos);
+      flotant.style.left = caixa.left + "px";
+      flotant.style.top = caixa.top + "px";
+      flotant.style.width = caixa.width + "px";
+      document.body.appendChild(flotant);
+      return flotant;
+    }
+
+    function desplaca(item, distancia) {
+      if (item.desplacat === distancia) {
         return;
       }
-      var fila = event.target.closest("tr[data-spec-id]");
-      if (!fila || desant) {
-        event.preventDefault();
+      item.desplacat = distancia;
+      item.nodes.forEach(function (node) {
+        node.style.setProperty("--desplaca", distancia + "px");
+      });
+    }
+
+    // Where everything goes for the current pointer position. Positions are
+    // measured inside the list when the drag starts, so they stay right
+    // while the page scrolls under the pointer.
+    function segueix() {
+      var dx = Math.max(-SIDEWAYS_MAX, Math.min(SIDEWAYS_MAX, (drag.x - drag.startX) * SIDEWAYS));
+      drag.flotant.style.transform = "translate(" + dx + "px, " + (drag.y - drag.startY) + "px)";
+
+      // A spec above gives way when the carried one passes its middle going
+      // up, and a spec below when it is passed going down.
+      var propi = drag.items[drag.from];
+      var centre = propi.mig + (drag.y + window.scrollY - drag.startPagina);
+      var a = drag.from;
+      var dalt = propi.dalt;
+      drag.items.forEach(function (item, index) {
+        if (index === drag.from) {
+          return;
+        }
+        var distancia = 0;
+        if (index < drag.from && centre < item.mig) {
+          distancia = propi.alt;
+          a -= 1;
+          dalt -= item.alt;
+        } else if (index > drag.from && centre > item.mig) {
+          distancia = -propi.alt;
+          a += 1;
+          dalt += item.alt;
+        }
+        desplaca(item, distancia);
+      });
+      drag.a = a;
+      drag.daltForat = dalt;
+      drag.forat.style.top = dalt + "px";
+    }
+
+    // Near the top or the bottom of the window the page scrolls by itself.
+    function desplacaSol() {
+      if (!drag || drag.acabant) {
+        return;
+      }
+      var vora = 70;
+      var pas = 0;
+      if (drag.y < vora) {
+        pas = -Math.ceil((vora - drag.y) / 6);
+      } else if (drag.y > window.innerHeight - vora) {
+        pas = Math.ceil((drag.y - (window.innerHeight - vora)) / 6);
+      }
+      if (pas) {
+        window.scrollBy(0, pas);
+        segueix();
+      }
+      drag.frame = requestAnimationFrame(desplacaSol);
+    }
+
+    function comenca(fila, pointerId, x, y) {
+      if (desant || drag) {
         return;
       }
       document.dispatchEvent(new CustomEvent("spec-tanca-editor"));
-      arrossegada = fila;
+      contenidor.querySelectorAll(".spec-notificacio-fila").forEach(function (notificacio) {
+        notificacio.remove();
+      });
+      var embolcall = contenidor.querySelector(".table-wrap");
+      if (!fila.isConnected || !embolcall) {
+        return;
+      }
       htmlInicial = contenidor.innerHTML;
-      fila.classList.add("spec-arrossegada");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", fila.getAttribute("data-spec-id"));
-    });
+      arrossegada = fila;
 
-    contenidor.addEventListener("dragover", function (event) {
-      var fila = filaSpecPer(event.target);
-      if (!fila || !arrossegada || fila === arrossegada || desant) {
-        return;
-      }
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      netejaIndicadors();
-      var rectangle = fila.getBoundingClientRect();
-      if (event.clientY < rectangle.top + rectangle.height / 2) {
-        fila.classList.add("spec-drop-abans");
-      } else {
-        fila.classList.add("spec-drop-apres");
-      }
-    });
-
-    contenidor.addEventListener("dragleave", function (event) {
-      if (!contenidor.contains(event.relatedTarget)) {
-        netejaIndicadors();
-      }
-    });
-
-    contenidor.addEventListener("drop", function (event) {
-      var desti = filaSpecPer(event.target);
-      if (!desti || !arrossegada || desti === arrossegada || desant) {
-        netejaIndicadors();
-        return;
-      }
-      event.preventDefault();
-
-      var inserirAbans = desti.classList.contains("spec-drop-abans");
-      var tots = grups();
-      var idArrossegat = arrossegada.getAttribute("data-spec-id");
-      var idDesti = desti.getAttribute("data-spec-id");
-      var origen = tots.findIndex(function (item) {
-        return item.id === idArrossegat;
+      // Every spec (its row and, if it has one, its description row),
+      // measured inside the box that holds the table.
+      var marc = embolcall.getBoundingClientRect();
+      var items = grups().map(function (item) {
+        var primer = item.nodes[0].getBoundingClientRect();
+        var darrer = item.nodes[item.nodes.length - 1].getBoundingClientRect();
+        var dalt = primer.top - marc.top + embolcall.scrollTop;
+        var alt = darrer.bottom - primer.top;
+        return { id: item.id, nodes: item.nodes, dalt: dalt, alt: alt, mig: dalt + alt / 2, desplacat: 0 };
       });
-      var destiIndex = tots.findIndex(function (item) {
-        return item.id === idDesti;
+      var from = items.findIndex(function (item) {
+        return item.nodes[0] === fila;
       });
-
-      netejaIndicadors();
-      if (origen === -1 || destiIndex === -1 || origen === destiIndex) {
+      if (from === -1) {
         return;
       }
 
-      var mogut = tots.splice(origen, 1)[0];
-      var posicio = destiIndex + (inserirAbans ? 0 : 1);
-      if (origen < destiIndex) {
-        posicio -= 1;
-      }
-      tots.splice(posicio, 0, mogut);
+      var flotant = creaFlotant(items[from].nodes);
+      // The blue slot: the place the carried spec would take.
+      var forat = document.createElement("div");
+      forat.className = "spec-slot";
+      forat.setAttribute("aria-hidden", "true");
+      forat.style.top = items[from].dalt + "px";
+      forat.style.height = items[from].alt + "px";
+      embolcall.appendChild(forat);
 
+      items[from].nodes.forEach(function (node) {
+        node.classList.add("spec-arrossegada");
+      });
+      contenidor.classList.add("sorting");
+      document.body.classList.add("reordering");
+      drag = {
+        fila: fila,
+        items: items,
+        from: from,
+        a: from,
+        flotant: flotant,
+        forat: forat,
+        embolcall: embolcall,
+        daltForat: items[from].dalt,
+        pointerId: pointerId,
+        x: x,
+        y: y,
+        startX: x,
+        startY: y,
+        startPagina: y + window.scrollY,
+        frame: null,
+        acabant: false
+      };
+      try {
+        fila.setPointerCapture(pointerId);
+      } catch (error) {
+        // A pointer the browser no longer knows: the drag simply never moves.
+      }
+      drag.frame = requestAnimationFrame(desplacaSol);
+    }
+
+    // Leaves the table as it was before the drag, without any animation.
+    function neteja(acabat) {
+      contenidor.classList.remove("sorting");
+      acabat.items.forEach(function (item) {
+        item.nodes.forEach(function (node) {
+          node.style.removeProperty("--desplaca");
+          node.classList.remove("spec-arrossegada");
+        });
+      });
+      acabat.flotant.remove();
+      acabat.forat.remove();
+      document.body.classList.remove("reordering");
+    }
+
+    // Puts the spec that was at `from` at position `a` and saves the order.
+    function reordena(items, from, a) {
       var tbody = contenidor.querySelector("tbody");
-      if (!tbody) {
+      if (!tbody || from === a) {
         return;
       }
+      var tots = items.slice();
+      tots.splice(a, 0, tots.splice(from, 1)[0]);
       tots.forEach(function (item) {
         item.nodes.forEach(function (node) {
           tbody.appendChild(node);
@@ -952,14 +1063,119 @@
       });
       actualitzaZebra();
       desaOrdre();
+    }
+
+    // `confirma` is false when the drag is cancelled (Escape, or the system
+    // taking the pointer away). Either way the carried spec glides into the
+    // slot (its new place, or the one it came from) before the table changes.
+    function acaba(confirma) {
+      if (!drag || drag.acabant) {
+        return;
+      }
+      var acabat = drag;
+      acabat.acabant = true;
+      cancelAnimationFrame(acabat.frame);
+      var a = confirma && !desant ? acabat.a : acabat.from;
+      if (a === acabat.from) {
+        acabat.items.forEach(function (item) {
+          desplaca(item, 0);
+        });
+        acabat.daltForat = acabat.items[acabat.from].dalt;
+        acabat.forat.style.top = acabat.daltForat + "px";
+      }
+      // The click that ends a drag must not press anything under it.
+      var empassa = function (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      };
+      window.addEventListener("click", empassa, { capture: true, once: true });
+      setTimeout(function () {
+        window.removeEventListener("click", empassa, { capture: true });
+      }, 50);
+
+      // Glide to the slot, wherever the page has scrolled to meanwhile.
+      var marc = acabat.embolcall.getBoundingClientRect();
+      var desti = marc.top + acabat.daltForat - acabat.embolcall.scrollTop;
+      acabat.flotant.classList.add("settling");
+      acabat.flotant.style.transform =
+        "translate(0px, " + (desti - parseFloat(acabat.flotant.style.top)) + "px)";
+
+      var senseMoviment = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      setTimeout(function () {
+        neteja(acabat);
+        drag = null;
+        arrossegada = null;
+        reordena(acabat.items, acabat.from, a);
+      }, senseMoviment ? 0 : GLIDE_MS);
+    }
+
+    contenidor.addEventListener("pointerdown", function (event) {
+      if (drag || pendent || desant || (event.pointerType === "mouse" && event.button !== 0)) {
+        return;
+      }
+      var fila = event.target.closest("tr[data-spec-id]");
+      if (!fila) {
+        return;
+      }
+      if (event.target.closest(".spec-drag-handle")) {
+        // The handle starts the drag at once, with a mouse or a finger.
+        event.preventDefault();
+        comenca(fila, event.pointerId, event.clientX, event.clientY);
+        return;
+      }
+      // Away from the handle only a mouse drags, and only once it is pulled:
+      // a finger there scrolls the page, and a click still reaches the row.
+      if (event.pointerType !== "mouse" || esControl(event.target)) {
+        return;
+      }
+      pendent = { fila: fila, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     });
 
-    contenidor.addEventListener("dragend", function () {
-      if (arrossegada) {
-        arrossegada.classList.remove("spec-arrossegada");
+    // While a spec is carried by a finger the page must not scroll under it.
+    contenidor.addEventListener("touchmove", function (event) {
+      if (drag && event.cancelable) {
+        event.preventDefault();
       }
-      arrossegada = null;
-      netejaIndicadors();
+    }, { passive: false });
+
+    document.addEventListener("pointermove", function (event) {
+      if (drag && event.pointerId === drag.pointerId) {
+        if (!drag.acabant) {
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          segueix();
+        }
+        return;
+      }
+      if (!pendent || event.pointerId !== pendent.pointerId) {
+        return;
+      }
+      if (Math.hypot(event.clientX - pendent.x, event.clientY - pendent.y) > PULL_PX) {
+        var inici = pendent;
+        pendent = null;
+        comenca(inici.fila, inici.pointerId, inici.x, inici.y);
+        if (drag) {
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          segueix();
+        }
+      }
+    });
+
+    function fiPunter(event) {
+      if (pendent && event.pointerId === pendent.pointerId) {
+        pendent = null;
+      }
+      if (drag && event.pointerId === drag.pointerId) {
+        acaba(event.type === "pointerup");
+      }
+    }
+    document.addEventListener("pointerup", fiPunter);
+    document.addEventListener("pointercancel", fiPunter);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && drag) {
+        acaba(false);
+      }
     });
   })();
   (function () {
