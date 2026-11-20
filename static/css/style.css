@@ -694,7 +694,10 @@ dialog.modal.fit[open] { height: min(760px, 90vh); }
 .detail-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 14px; }
 .detail-layout { display: flex; gap: 24px; flex: 1 1 auto; min-height: 0; }
 .detail-main { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
-.detail-side { flex: 0 0 250px; overflow-y: auto; }
+/* A scrolling box clips whatever sticks out of it, on every side. The focus
+   ring of a field sticks out 4px, so the box keeps that much room around its
+   content and takes it back with a negative margin, to stay aligned. */
+.detail-side { flex: 0 0 258px; overflow-y: auto; padding: 4px; margin: -4px; }
 .detail-side section { margin-bottom: 18px; }
 .detail-side h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
 .detail-side .btn { width: 100%; justify-content: flex-start; }
@@ -709,8 +712,12 @@ dialog.modal.fit[open] { height: min(760px, 90vh); }
   padding: 7px 12px; border: 0; background: none; font: inherit; font-size: 0.9rem; color: var(--text-muted);
   border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap;
 }
+/* The row of tabs scrolls sideways, which would clip the ring of a tab that
+   touches its edge: there the ring is drawn inside the tab. */
+.subtabs button:focus-visible { outline-offset: -2px; }
 .subtabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-.tab-panel { flex: 1 1 auto; min-height: 120px; overflow-y: auto; padding-right: 8px; }
+/* Room for the focus ring of its fields, like .detail-side above. */
+.tab-panel { flex: 1 1 auto; min-height: 120px; overflow-y: auto; padding: 4px 8px 4px 4px; margin: -4px 0 -4px -4px; }
 .tab-help { margin: 0 0 10px; }
 .comment-row { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid var(--border); margin: 0; }
 .comment-row textarea { min-height: 56px; }
