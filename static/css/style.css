@@ -726,10 +726,21 @@ dialog.modal.fit[open] { height: min(760px, 90vh); }
 
 /* ---- Kanban: progress matrix -------------------------------------------- */
 
-.matrix-wrap { overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); max-height: 70vh; }
+/* The matrix is as tall as its rows: only the page scrolls up and down, and
+   the box scrolls sideways when the tasks do not fit. */
+.matrix-wrap { overflow-x: auto; overflow-y: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
 .matrix { border-collapse: separate; border-spacing: 0; width: auto; }
 .matrix th, .matrix td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 6px; }
-.matrix thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; min-width: 46px; max-width: 46px; text-align: center; background: var(--strip); }
+/* When the page scrolls past the header, its bottom strip (the task numbers)
+   stays under the top bar: the script of the matrix sets --stick to how far
+   the header has to be pushed down (see matriu.html). */
+.matrix thead th { position: relative; z-index: 2; transform: translateY(var(--stick, 0px)); vertical-align: bottom; min-width: 46px; max-width: 46px; text-align: center; background: var(--strip); }
+/* While stuck, a shadow under the strip only: a fading band below each cell,
+   with nothing at the sides or above (a blurred box shadow spreads all round). */
+.matrix.stuck thead th::after {
+  content: ''; position: absolute; left: 0; right: -1px; top: calc(100% + 1px); height: 6px;
+  background: linear-gradient(rgba(16, 24, 40, 0.16), rgba(16, 24, 40, 0)); pointer-events: none;
+}
 .matrix thead th .col-title {
   display: inline-block; vertical-align: bottom;
   writing-mode: vertical-rl; transform: rotate(180deg); max-height: 240px; overflow: hidden;
@@ -756,6 +767,8 @@ dialog.modal.fit[open] { height: min(760px, 90vh); }
 .cell.test { background: var(--test); }
 .cell.finalitzat { background: var(--finalitzat); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+/* The legend of the matrix sits at the right end of the row above the table. */
+.toolbar .legend { margin: 0 0 0 auto; }
 
 /* ---- Kanban: teamwork badges -------------------------------------------- */
 
