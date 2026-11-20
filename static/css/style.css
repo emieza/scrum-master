@@ -599,8 +599,23 @@ dialog.modal > form { display: flex; flex-direction: column; min-height: 0; flex
 .task-card.bloquejat { border-left-color: var(--bloquejat); }
 .task-card.test { border-left-color: var(--test); }
 .task-card.finalitzat { border-left-color: var(--finalitzat); }
-.task-card[draggable='true'] { cursor: grab; }
-.task-card.dragging { opacity: 0.45; }
+.task-card { transition: scale 0.14s ease, box-shadow 0.14s ease; }
+/* A card that can be dragged to another column (mouse: pull it; touch: long press). */
+.task-card.can-drag { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* Being carried: a little bigger and with a deeper shadow, above everything. */
+.task-card.lifted { position: fixed; z-index: 40; margin: 0; scale: 1.05; box-shadow: var(--shadow-lg); cursor: grabbing; }
+/* Pressed with the mouse, about to be carried: it lifts where it is. */
+.task-card.pressed { position: relative; z-index: 2; scale: 1.05; box-shadow: var(--shadow-lg); cursor: grabbing; }
+/* Gliding back to its place after a cancelled drag. */
+.task-card.lifted.returning { scale: 1; box-shadow: var(--shadow-sm); transition: transform 0.16s ease, scale 0.16s ease, box-shadow 0.16s ease; }
+/* The dimmed copy that keeps the card's place while it is carried. */
+.task-card.drag-ghost { opacity: 0.35; pointer-events: none; }
+/* Just dropped: it glides to its place above the other cards (see aterra() in tauler.js). */
+.task-card.landing { position: relative; z-index: 3; }
+/* The columns the carried card may be dropped on. */
+.column.drop-allowed { border-style: dashed; border-color: var(--border-strong); }
+.column.drop-allowed.drop-ok { border-style: solid; }
+body.reordering { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .task-card:hover { box-shadow: var(--shadow); }
 .task-title {
   display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left;

@@ -9,8 +9,7 @@
       <article class="task-card {{ targeta.estat }}"
                data-spec="{{ targeta.spec.id }}"
                data-estat="{{ targeta.estat }}"
-               data-sprints="{{ targeta.sprint_ids }}"
-               {% if pot_editar %}draggable="true"{% endif %}>
+               data-sprints="{{ targeta.sprint_ids }}">
         <button type="button" class="task-title" data-obre-tasca="{{ targeta.spec.id }}">
           <span class="task-num">{{ targeta.spec.ordre }}.</span> {{ targeta.spec.nom }}
         </button>
