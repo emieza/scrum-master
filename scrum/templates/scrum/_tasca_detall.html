@@ -1,0 +1,213 @@
+{% load icons scrum_extras %}
+<div class="modal-header">
+  <h2><span class="task-num">{{ spec.ordre }}.</span> {{ spec.nom }}</h2>
+  <button type="button" class="btn icon-only ghost" data-modal-close aria-label="Tanca">{% icon "close" %}</button>
+</div>
+<div class="modal-body" data-spec="{{ spec.id }}">
+  <div class="detail-meta">
+    <span class="muted">{{ equip.projecte.nom }} · {{ equip.nom }}</span>
+    {% for sprint in sprints %}
+      <span class="tag">{{ sprint.nom }}</span>
+    {% empty %}
+      <span class="tag">Backlog</span>
+    {% endfor %}
+    {% for mp in moduls %}
+      <span class="chip">{{ mp }}</span>
+    {% endfor %}
+  </div>
+
+  <div class="detail-layout">
+    <div class="detail-main">
+      <div class="subtabs" role="tablist">
+        <button type="button" role="tab" data-tab="descripcio" aria-selected="true">Descripció</button>
+        {% if not public %}
+          <button type="button" role="tab" data-tab="seguiment" aria-selected="false">Seguiment ({{ comentaris|length }})</button>
+          <button type="button" role="tab" data-tab="bloquejos" aria-selected="false">Bloquejos ({{ bloquejos|length }})</button>
+          <button type="button" role="tab" data-tab="historial" aria-selected="false">Historial</button>
+        {% endif %}
+      </div>
+
+      <div class="tab-panel" data-panel="descripcio">
+        {% if spec.descripcio %}
+          <div class="rich-text">{{ spec.descripcio|safe }}</div>
+        {% else %}
+          <p class="muted">Aquesta tasca no té descripció.</p>
+        {% endif %}
+        <p class="muted">Hores estimades: {{ spec.hores_estimades|floatformat:"-1" }}</p>
+      </div>
+
+      {% if not public %}
+        <div class="tab-panel" data-panel="seguiment" hidden>
+          <p class="hint tab-help">
+            Notes de l'equip sobre com va la feina d'aquesta tasca. No són la valoració
+            del professorat.
+          </p>
+          <ul class="timeline">
+            {% for comentari in comentaris %}
+              <li>
+                <div class="head">
+                  <strong>{{ comentari.autor|nom_persona }}</strong>
+                  <span class="when">{{ comentari.creat_el|date:"j \d\e M Y, H:i" }}</span>
+                </div>
+                <div class="text">{{ comentari.text }}</div>
+              </li>
+            {% empty %}
+              <li class="muted">Encara no hi ha cap comentari de seguiment.</li>
+            {% endfor %}
+          </ul>
+          <form class="comment-row" data-accio="comentari" data-edicio>
+            <label class="sr-only" for="comentari-text">Comentari de seguiment</label>
+            <textarea class="input" id="comentari-text" name="text" required maxlength="4000"
+                      placeholder="Com va la feina?"></textarea>
+            <button class="btn primary" type="submit">Comenta</button>
+          </form>
+        </div>
+
+        <div class="tab-panel" data-panel="bloquejos" hidden>
+          <ul class="timeline">
+            {% for bloqueig in bloquejos %}
+              <li class="{% if not bloqueig.tancat_el %}event-block{% endif %}">
+                <div class="head">
+                  <strong>{{ bloqueig.obert_per|nom_persona }}</strong>
+                  <span class="when">
+                    {{ bloqueig.obert_el|date:"j \d\e M Y, H:i" }}
+                    {% if bloqueig.tancat_el %}
+                      → {{ bloqueig.tancat_el|date:"j \d\e M Y, H:i" }}
+                      (desbloquejada per {{ bloqueig.tancat_per|nom_persona }},
+                      després de {{ bloqueig.obert_el|timesince:bloqueig.tancat_el }})
+                    {% else %}
+                      · encara oberta, fa {{ bloqueig.obert_el|timesince }}
+                    {% endif %}
+                  </span>
+                </div>
+                <div class="text">{{ bloqueig.motiu }}</div>
+              </li>
+            {% empty %}
+              <li class="muted">Aquesta tasca no s'ha bloquejat mai.</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="tab-panel" data-panel="historial" hidden>
+          <ul class="timeline">
+            {% for event in events %}
+              <li>
+                <div class="head">
+                  <strong>{{ event.usuari|nom_persona }}</strong>
+                  <span>
+                    {% if event.tipus == "estat" %}
+                      ha mogut la tasca de «{{ event.estat_origen|nom_estat }}» a «{{ event.estat_desti|nom_estat }}»
+                    {% elif event.tipus == "responsable" %}
+                      {% if event.text %}{{ event.text }}{% elif event.afectat %}ha passat la responsabilitat a {{ event.afectat|nom_persona }}{% else %}ha deixat la tasca sense responsable{% endif %}
+                    {% elif event.tipus == "colaborador_afegit" %}
+                      ha afegit {{ event.afectat|nom_persona }} com a col·laborador
+                    {% elif event.tipus == "colaborador_tret" %}
+                      ha tret {{ event.afectat|nom_persona }} dels col·laboradors
+                    {% elif event.tipus == "comentari" %}
+                      ha afegit un comentari de seguiment
+                    {% endif %}
+                  </span>
+                  <span class="when">{{ event.creat_el|date:"j \d\e M Y, H:i" }}</span>
+                </div>
+                {% if event.tipus == "estat" and event.text %}<div class="text">{{ event.text }}</div>{% endif %}
+              </li>
+            {% empty %}
+              <li class="muted">Encara no ha passat res amb aquesta tasca.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="detail-side">
+      <section>
+        <h3>Estat</h3>
+        <span class="status {{ tasca.estat }}">{% estat_icon tasca.estat %}{{ nom_estat }}</span>
+        {% if transicions and pot_editar %}
+          <div class="stack-sm" data-edicio>
+            {% for estat, nom in transicions %}
+              <button type="button" class="btn small" data-mou-estat="{{ estat }}">
+                {% estat_icon estat %}Mou a «{{ nom }}»
+              </button>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </section>
+
+      {% if not public %}
+        <section>
+          <h3>Responsable</h3>
+          {% if tasca.responsable %}
+            <div class="person">
+              <span class="avatar" aria-hidden="true">{{ tasca.responsable|inicials }}</span>
+              <span>{{ tasca.responsable|nom_persona }}</span>
+            </div>
+          {% else %}
+            <p class="muted">Sense responsable</p>
+          {% endif %}
+          {% if pot_assumir %}
+            <form data-accio="responsable" data-edicio>
+              <input type="hidden" name="usuari" value="{{ request.user.pk }}">
+              <button class="btn small" type="submit">Assumeix la tasca</button>
+            </form>
+          {% elif pot_traspassar and candidats_responsable or es_profe and tasca.responsable %}
+            <form class="stack-sm" data-accio="responsable" data-edicio>
+              <label class="sr-only" for="nou-responsable">Nova persona responsable</label>
+              <select class="input" id="nou-responsable" name="usuari">
+                {% if es_profe %}<option value="">Sense responsable</option>{% endif %}
+                {% for persona in candidats_responsable %}
+                  <option value="{{ persona.pk }}">{{ persona|nom_persona }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn small" type="submit">Transfereix la responsabilitat</button>
+            </form>
+          {% endif %}
+          {% if tasca.estat == "test" and not es_profe and tasca.responsable_id == request.user.pk %}
+            <p class="hint">L'ha de validar una altra persona de l'equip. Mentre és a «Test» no es pot traspassar.</p>
+          {% endif %}
+        </section>
+
+        <section>
+          <h3>Col·laboradors</h3>
+          {% for persona in colaboradors %}
+            <div class="person collaborator">
+              <span class="avatar" aria-hidden="true">{{ persona|inicials }}</span>
+              <span>{{ persona|nom_persona }}</span>
+              {% if pot_colaboradors %}
+                <form data-accio="colaborador" data-edicio>
+                  <input type="hidden" name="usuari" value="{{ persona.pk }}">
+                  <input type="hidden" name="accio" value="treu">
+                  <button class="btn small ghost" type="submit" aria-label="Treu {{ persona|nom_persona }}">Treu</button>
+                </form>
+              {% endif %}
+            </div>
+          {% empty %}
+            <p class="muted">Cap col·laborador</p>
+          {% endfor %}
+          {% if pot_colaboradors and candidats_colaborador %}
+            <form class="stack-sm" data-accio="colaborador" data-edicio>
+              <label class="sr-only" for="nou-colaborador">Persona que hi col·labora</label>
+              <select class="input" id="nou-colaborador" name="usuari">
+                {% for persona in candidats_colaborador %}
+                  <option value="{{ persona.pk }}">{{ persona|nom_persona }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn small" type="submit">Afegeix col·laborador</button>
+            </form>
+          {% endif %}
+        </section>
+
+        {% if qualificat is not None %}
+          <section>
+            <h3>Qualificació del professorat</h3>
+            <p><strong>{{ qualificat|floatformat:"-1" }}%</strong></p>
+            <p class="hint">
+              «Finalitzat» és el que diu l'equip; aquest percentatge és el que ha
+              acceptat el professorat. Poden no coincidir.
+            </p>
+          </section>
+        {% endif %}
+      {% endif %}
+    </aside>
+  </div>
+</div>

@@ -3,6 +3,7 @@ import datetime
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
+from scrum import kanban
 from scrum.models import (
     Categoria,
     Centre,
@@ -241,7 +242,51 @@ class Command(BaseCommand):
             },
         )
 
+        self._tauler_kanban(equip, specs, alumnes)
+
         self.stdout.write(self.style.SUCCESS("Dades d'exemple creades correctament."))
         self.stdout.write("Superusuari: admin@scrummaster.local / admin12345")
         self.stdout.write("Professor: profe@scrummaster.local / profe12345")
         self.stdout.write("Alumne: alumne1@scrummaster.local / alumne12345")
+
+    def _tauler_kanban(self, equip, specs, alumnes):
+        """Deixa el tauler Kanban de l'equip amb tasques a tots els estats."""
+        if equip.tasques.exists():
+            return
+        laia, pau, nil = alumnes
+        membre = kanban.MEMBRE
+
+        # Dues tasques acabades: cadascuna validada per una altra persona.
+        for spec, responsable, revisor in (
+            (specs[0], laia, pau),
+            (specs[1], pau, nil),
+        ):
+            kanban.mou(equip, spec, responsable, membre, kanban.EN_CURS)
+            kanban.mou(equip, spec, responsable, membre, kanban.TEST)
+            kanban.mou(equip, spec, revisor, membre, kanban.FINALITZAT)
+
+        # En curs, amb un col·laborador i un comentari de seguiment.
+        kanban.mou(equip, specs[2], nil, membre, kanban.EN_CURS)
+        kanban.canvia_colaborador(equip, specs[2], nil, membre, laia, afegeix=True)
+        kanban.comenta(
+            equip,
+            specs[2],
+            nil,
+            membre,
+            "Ja es validen les lletres; falta restar les vides quan es falla.",
+        )
+
+        # Bloquejada: el motiu és obligatori.
+        kanban.mou(equip, specs[3], laia, membre, kanban.EN_CURS)
+        kanban.mou(
+            equip,
+            specs[3],
+            laia,
+            membre,
+            kanban.BLOQUEJAT,
+            "Falta decidir amb el professorat com es calcula la puntuació.",
+        )
+
+        # Esperant que una altra persona de l'equip la validi.
+        kanban.mou(equip, specs[4], pau, membre, kanban.EN_CURS)
+        kanban.mou(equip, specs[4], pau, membre, kanban.TEST)

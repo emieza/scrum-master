@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% comment %}
+  Layout for the pages django-allauth renders with its own templates
+  (password reset, logout confirmation, email management…), so they share the
+  site's top bar and styles instead of showing up as bare HTML.
+{% endcomment %}
+
+{% block title %}{% block head_title %}{% endblock %} · Scrum Master{% endblock %}
+
+{% block main_class %}allauth-page{% endblock %}
+
+{# allauth's own templates fill "content"; these two blocks wrap it in a card. #}
+{% block content_open %}<div class="allauth-body">{% endblock %}
+{% block content_close %}</div>{% endblock %}

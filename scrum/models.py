@@ -164,6 +164,14 @@ class Projecte(models.Model):
     cicle = models.ForeignKey(
         Cicle, on_delete=models.SET_NULL, null=True, blank=True, related_name="projectes"
     )
+    insignies_visibles = models.BooleanField(
+        "mostra les insígnies a l'alumnat",
+        default=True,
+        help_text=(
+            "Si es desactiva, només el professorat veu les insígnies de "
+            "treball en equip del tauler Kanban."
+        ),
+    )
 
     def __str__(self):
         return self.nom
@@ -618,3 +626,163 @@ class SpecFeedback(models.Model):
 
     def __str__(self):
         return "{} - {}".format(self.spec, self.data)
+
+
+class TascaEquip(models.Model):
+    """Estat d'una spec al tauler Kanban d'un equip.
+
+    Cada equip té el seu propi estat per a cada spec del projecte. La fila es
+    crea el primer cop que l'equip toca la tasca: mentre no existeix, la
+    tasca és «Pendent».
+    """
+
+    PENDENT = "pendent"
+    EN_CURS = "en_curs"
+    BLOQUEJAT = "bloquejat"
+    TEST = "test"
+    FINALITZAT = "finalitzat"
+    ESTATS = (
+        (PENDENT, "Pendent"),
+        (EN_CURS, "En curs"),
+        (BLOQUEJAT, "Bloquejat"),
+        (TEST, "Test"),
+        (FINALITZAT, "Finalitzat"),
+    )
+
+    class Meta:
+        verbose_name = "tasca d'equip"
+        verbose_name_plural = "tasques d'equip"
+        ordering = ["equip", "spec__ordre", "spec__id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["equip", "spec"], name="unique_tasca_equip_spec"
+            ),
+        ]
+
+    equip = models.ForeignKey(
+        Equip, on_delete=models.CASCADE, related_name="tasques"
+    )
+    spec = models.ForeignKey(
+        Spec, on_delete=models.CASCADE, related_name="tasques_equip"
+    )
+    estat = models.CharField(max_length=12, choices=ESTATS, default=PENDENT)
+    estat_abans_bloqueig = models.CharField(
+        max_length=12, choices=ESTATS, blank=True
+    )
+    responsable = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasques_responsable",
+    )
+    colaboradors = models.ManyToManyField(
+        User, blank=True, related_name="tasques_colaborador"
+    )
+    enviada_a_test_per = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    validada_per = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasques_validades",
+        help_text="Qui ha passat la tasca de «Test» a «Finalitzat».",
+    )
+    finalitzada_el = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return "{} · {} ({})".format(
+            self.equip, self.spec, self.get_estat_display()
+        )
+
+
+class TascaBloqueig(models.Model):
+    """Bloqueig d'una tasca: sempre amb el motiu."""
+
+    class Meta:
+        verbose_name = "bloqueig de tasca"
+        verbose_name_plural = "bloquejos de tasques"
+        ordering = ["-obert_el", "-id"]
+
+    tasca = models.ForeignKey(
+        TascaEquip, on_delete=models.CASCADE, related_name="bloquejos"
+    )
+    motiu = models.TextField()
+    obert_per = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    obert_el = models.DateTimeField(default=timezone.now)
+    tancat_per = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    tancat_el = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return "{}: {}".format(self.tasca, self.motiu[:60])
+
+
+class TascaComentari(models.Model):
+    """Comentari de seguiment: com va la feina d'una tasca."""
+
+    class Meta:
+        verbose_name = "comentari de seguiment"
+        verbose_name_plural = "comentaris de seguiment"
+        ordering = ["creat_el", "id"]
+
+    tasca = models.ForeignKey(
+        TascaEquip, on_delete=models.CASCADE, related_name="comentaris"
+    )
+    autor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    text = models.TextField()
+    creat_el = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return "{}: {}".format(self.autor, self.text[:60])
+
+
+class TascaEvent(models.Model):
+    """Historial d'una tasca. Només s'hi afegeix: no es modifica mai."""
+
+    ESTAT = "estat"
+    RESPONSABLE = "responsable"
+    COLABORADOR_AFEGIT = "colaborador_afegit"
+    COLABORADOR_TRET = "colaborador_tret"
+    COMENTARI = "comentari"
+    TIPUS = (
+        (ESTAT, "Canvi d'estat"),
+        (RESPONSABLE, "Canvi de responsable"),
+        (COLABORADOR_AFEGIT, "Col·laborador afegit"),
+        (COLABORADOR_TRET, "Col·laborador tret"),
+        (COMENTARI, "Comentari"),
+    )
+
+    class Meta:
+        verbose_name = "esdeveniment de tasca"
+        verbose_name_plural = "historial de tasques"
+        ordering = ["creat_el", "id"]
+
+    tasca = models.ForeignKey(
+        TascaEquip, on_delete=models.CASCADE, related_name="events"
+    )
+    usuari = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    tipus = models.CharField(max_length=20, choices=TIPUS)
+    estat_origen = models.CharField(max_length=12, blank=True)
+    estat_desti = models.CharField(max_length=12, blank=True)
+    afectat = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    text = models.TextField(blank=True)
+    creat_el = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return "{} · {}".format(self.tasca, self.get_tipus_display())

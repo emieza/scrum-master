@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+{% load static %}
+{% comment %}
+  Dresses the Django admin in the site's look (see static/css/admin_theme.css).
+  The admin's own dark mode is switched off: the rest of the site is light only.
+{% endcomment %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Scrum Master{% endblock %}
+
+{% block dark-mode-vars %}{% endblock %}
+
+{% block extrastyle %}
+<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+<link rel="stylesheet" href="{% static 'css/admin_theme.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+  <a href="{% url 'admin:index' %}">
+    <img src="{% static 'img/favicon.svg' %}" alt="">Scrum Master · Administració
+  </a>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

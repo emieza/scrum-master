@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static icons scrum_extras %}
+
+{% block title %}Tauler · {{ equip.nom }} · Scrum Master{% endblock %}
+
+{% block main_class %}wide{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb">
+      <a href="{% url 'projecte' projecte.id %}">{{ projecte.nom }}</a> / Tauler Kanban
+    </p>
+    <h1>{{ equip.nom }}</h1>
+  </div>
+  <div class="actions">
+    {% if mostra_insignies %}
+      <a class="btn" href="{% url 'insignies_projecte' projecte.id %}">{% icon "award" %}Insígnies</a>
+    {% endif %}
+    {% if es_profe %}
+      <a class="btn" href="{% url 'matriu_projecte' projecte.id %}">{% icon "grid" %}Matriu de progrés</a>
+    {% endif %}
+    <a class="btn" href="{% url 'projecte' projecte.id %}">{% icon "list" %}Descripció del projecte</a>
+  </div>
+</div>
+
+<div class="board-info">
+  {% if public %}
+    <span class="notice board-public">
+      Vista pública del tauler: no es mostren noms, comentaris ni motius de bloqueig.
+    </span>
+  {% else %}
+    <span><strong>Membres:</strong>
+      {% for membre in membres %}{{ membre|nom_persona }}{% if not forloop.last %}, {% endif %}{% empty %}cap{% endfor %}
+    </span>
+  {% endif %}
+  <span class="grow"></span>
+  {% if sprints %}
+    <label class="inline-field">
+      <span>Mostra</span>
+      <select class="input" id="filtre-sprint">
+        <option value="">Tots els sprints</option>
+        {% for sprint in sprints %}
+          <option value="{{ sprint.id }}">{{ sprint.nom }}</option>
+        {% endfor %}
+        <option value="backlog">Backlog (sense sprint)</option>
+      </select>
+    </label>
+  {% endif %}
+  {% if es_profe %}
+    <label class="switch" title="El professorat entra als taulers en mode de només lectura">
+      <input type="checkbox" id="permet-edicio">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span>Permet l'edició</span>
+    </label>
+  {% endif %}
+</div>
+
+<div id="tauler"
+     class="board{% if es_profe %} nomes-lectura{% endif %}"
+     data-base="{% url 'tauler' equip.id %}"
+     data-versio="{{ versio }}"
+     data-interval="{{ interval }}"
+     data-pot-editar="{% if pot_editar %}1{% endif %}"
+     data-es-profe="{% if es_profe %}1{% endif %}">
+  {% include "scrum/_tauler_columnes.html" %}
+</div>
+
+<dialog id="modal-tasca" class="modal wide fit" aria-label="Detall de la tasca">
+  <div id="tasca-contingut" class="tasca-contingut"></div>
+</dialog>
+
+<dialog id="modal-motiu" class="modal" aria-labelledby="modal-motiu-titol">
+  <form id="form-motiu" method="dialog">
+    <div class="modal-header">
+      <h2 id="modal-motiu-titol">Bloqueja la tasca</h2>
+      <button type="button" class="btn icon-only ghost" data-modal-close aria-label="Tanca">{% icon "close" %}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="motiu-text">Per què està bloquejada?</label>
+        <textarea class="input" id="motiu-text" required maxlength="2000"></textarea>
+        <p class="hint">El motiu és obligatori i es veurà a la targeta.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-modal-close>Cancel·la</button>
+      <button type="submit" class="btn primary">Bloqueja</button>
+    </div>
+  </form>
+</dialog>
+
+<div hidden>{% csrf_token %}</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/tauler.js' %}"></script>
+{% endblock %}

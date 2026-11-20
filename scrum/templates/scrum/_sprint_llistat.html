@@ -1,33 +1,30 @@
+{% load icons %}
 {% for sprint in sprints %}
-  <div id="sprint-missatge-{{ sprint.id }}" class="card-panel ajax-missatge" style="display: none;"></div>
+  <div id="sprint-missatge-{{ sprint.id }}" class="notice ajax-missatge" role="status" hidden></div>
   <div class="card">
-    <div class="card-content">
-      <span class="card-title">{{ sprint.nom }}</span>
-      <form method="post" action="{% url 'edita_sprint' sprint.id %}" data-ajax-form data-ajax-desti="#sprints-llistat" data-ajax-missatge="#sprint-missatge-{{ sprint.id }}">
-        {% csrf_token %}
-        <div class="row">
-          <div class="input-field col s12 m4">
-            <input type="text" name="nom" id="sprint-nom-{{ sprint.id }}"
-                   value="{{ sprint.nom }}" maxlength="255" required>
-            <label for="sprint-nom-{{ sprint.id }}" class="active">Nom del sprint</label>
-          </div>
-          <div class="input-field col s12 m4">
-            <input type="date" name="inici" id="sprint-inici-{{ sprint.id }}"
-                   value="{{ sprint.inici|date:'Y-m-d' }}" required>
-            <label for="sprint-inici-{{ sprint.id }}" class="active">Data d'inici</label>
-          </div>
-          <div class="input-field col s12 m4">
-            <input type="date" name="final" id="sprint-final-{{ sprint.id }}"
-                   value="{{ sprint.final|date:'Y-m-d' }}" required>
-            <label for="sprint-final-{{ sprint.id }}" class="active">Data final</label>
-          </div>
+    <h3 class="card-title">{{ sprint.nom }}</h3>
+    <form method="post" action="{% url 'edita_sprint' sprint.id %}" data-ajax-form data-ajax-desti="#sprints-llistat" data-ajax-missatge="#sprint-missatge-{{ sprint.id }}">
+      {% csrf_token %}
+      <div class="form-row">
+        <div class="field">
+          <label for="sprint-nom-{{ sprint.id }}">Nom del sprint</label>
+          <input class="input" type="text" name="nom" id="sprint-nom-{{ sprint.id }}"
+                 value="{{ sprint.nom }}" maxlength="255" required>
         </div>
-        <button class="btn waves-effect waves-light" type="submit">
-          <i class="material-icons left">save</i>Desa el sprint
-        </button>
-      </form>
-    </div>
+        <div class="field">
+          <label for="sprint-inici-{{ sprint.id }}">Data d'inici</label>
+          <input class="input" type="date" name="inici" id="sprint-inici-{{ sprint.id }}"
+                 value="{{ sprint.inici|date:'Y-m-d' }}" required>
+        </div>
+        <div class="field">
+          <label for="sprint-final-{{ sprint.id }}">Data final</label>
+          <input class="input" type="date" name="final" id="sprint-final-{{ sprint.id }}"
+                 value="{{ sprint.final|date:'Y-m-d' }}" required>
+        </div>
+      </div>
+      <button class="btn" type="submit">{% icon "save" %}Desa el sprint</button>
+    </form>
   </div>
 {% empty %}
-  <p>Encara no hi ha cap sprint en aquest projecte.</p>
+  <p class="empty">Encara no hi ha cap sprint en aquest projecte.</p>
 {% endfor %}

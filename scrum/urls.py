@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_kanban
 
 urlpatterns = [
     path("", views.index, name="home"),
@@ -122,5 +122,57 @@ urlpatterns = [
         "scrum/api/set_comment_to_qualificacio/<int:qualificacio_id>",
         views.set_comment_to_qualificacio,
         name="set_comment_to_qualificacio",
+    ),
+    # Tauler Kanban dels equips
+    path("scrum/equips/<int:equip_id>/tauler", views_kanban.tauler, name="tauler"),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/columnes",
+        views_kanban.tauler_columnes,
+        name="tauler_columnes",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/versio",
+        views_kanban.tauler_versio,
+        name="tauler_versio",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/tasques/<int:spec_id>",
+        views_kanban.tasca_detall,
+        name="tasca_detall",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/tasques/<int:spec_id>/mou",
+        views_kanban.tasca_mou,
+        name="tasca_mou",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/tasques/<int:spec_id>/responsable",
+        views_kanban.tasca_responsable,
+        name="tasca_responsable",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/tasques/<int:spec_id>/colaborador",
+        views_kanban.tasca_colaborador,
+        name="tasca_colaborador",
+    ),
+    path(
+        "scrum/equips/<int:equip_id>/tauler/tasques/<int:spec_id>/comentari",
+        views_kanban.tasca_comentari,
+        name="tasca_comentari",
+    ),
+    path(
+        "scrum/projecte/<int:projecte_id>/insignies",
+        views_kanban.insignies_projecte,
+        name="insignies_projecte",
+    ),
+    path(
+        "scrum/projecte/<int:projecte_id>/matriu",
+        views_kanban.matriu_projecte,
+        name="matriu_projecte",
+    ),
+    path(
+        "scrum/tasques-bloquejades",
+        views_kanban.tasques_bloquejades,
+        name="tasques_bloquejades",
     ),
 ]

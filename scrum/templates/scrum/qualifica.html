@@ -1,207 +1,135 @@
 {% extends "base.html" %}
+{% load icons %}
 
 {% block title %}{% if projecte_fixat %}Qualifica {{ projecte.nom }}{% else %}Qualifica projectes{% endif %} · Scrum Master{% endblock %}
 
-{% block extra_css %}
-#modal-specs .spec-mps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.4rem;
-}
-#modal-specs .spec-mps .chip {
-  height: auto;
-  min-height: 1.8rem;
-  line-height: 1.3;
-  padding: 0.25rem 0.75rem;
-  margin: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  max-width: 100%;
-}
-#modal-specs .spec-fila {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-#modal-specs .spec-info {
-  flex: 1 1 60%;
-}
-#modal-specs .spec-percentatge {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0;
-  color: #616161;
-  white-space: nowrap;
-}
-#modal-specs .spec-percentatge input {
-  width: 5rem;
-  height: 2.2rem;
-  margin: 0;
-  padding: 0 0.5rem;
-  border: 1px solid #9e9e9e;
-  border-radius: 4px;
-  text-align: right;
-}
-#modal-specs .spec-percentatge input:focus {
-  border-bottom: 1px solid #26a69a;
-  box-shadow: 0 1px 0 0 #26a69a;
-}
-#modal-specs .spec-percentatge-etiqueta {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-#modal-specs .spec-percentatges-mp {
-  width: 100%;
-  margin-top: 0.5rem;
-  border-top: 1px solid #e0e0e0;
-  padding-top: 0.35rem;
-}
-#modal-specs .spec-percentatges-mp summary {
-  cursor: pointer;
-  color: #455a64;
-  font-size: 0.9rem;
-  padding: 0.35rem 0;
-}
-#modal-specs .spec-mp-fila {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.3rem 0 0.3rem 1rem;
-}
-#modal-specs .spec-mp-nom {
-  flex: 1 1 auto;
-}
-{% endblock %}
-
 {% block content %}
-<div class="container">
-  <div class="section">
-    <h2>{% if projecte_fixat %}Qualifica: {{ projecte.nom }}{% else %}Qualifica projectes Scrum{% endif %}</h2>
-
+<div class="page-header">
+  <div class="titles">
     {% if projecte_fixat %}
-      <p><a href="{% url 'els_meus_projectes' %}"><i class="material-icons left">arrow_back</i>Torna als meus projectes</a></p>
-    {% else %}
-      <form method="get">
-        <div class="input-field col s12 m6">
-          <select name="projecte_id" id="projecte" onchange="this.form.submit()">
-            <option value="">--- tria un projecte ---</option>
-            {% for proj in projectes %}
-              <option value="{{ proj.id }}" {% if projecte and proj.id == projecte.id %}selected{% endif %}>
-                {{ proj.nom }}
-              </option>
-            {% endfor %}
-          </select>
-          <label>Projecte</label>
-        </div>
-      </form>
+      <p class="breadcrumb"><a href="{% url 'els_meus_projectes' %}">Els meus projectes</a></p>
     {% endif %}
+    <h1>{% if projecte_fixat %}Qualifica: {{ projecte.nom }}{% else %}Qualifica projectes Scrum{% endif %}</h1>
   </div>
-
   {% if projecte %}
-    <div class="section">
-      <h4>{% if not projecte_fixat %}Projecte: {% endif %}{{ projecte.nom }}</h4>
-      <label>
-        <input type="checkbox" id="toggle_members" onclick="toggle_members()">
-        <span>Mostrar / amagar membres</span>
-      </label>
-      <a class="waves-effect waves-light right light-blue btn" href="{% url 'descarrega_qualificacions' projecte.id %}">
-        <i class="material-icons left">file_download</i>Descarrega ODS
-      </a>
-
-      <div class="clearfix"></div>
-
-      {% for equip in projecte.equips.all %}
-        <div class="row" style="margin-top: 1.5rem;">
-          <div class="col s12 m8">
-            <h5>{{ equip.nom }}</h5>
-            <div class="hide membersbox">
-              {% for membre in equip.membres.all %}
-                &nbsp;&nbsp;&nbsp;&nbsp;{{ membre.email }}<br>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="col s12 m4">
-            <select onchange="crea_qualificacio(this, {{ equip.id }})">
-              <option value="">--- afegeix qualificació ---</option>
-              {% for sprint in projecte.sprints.all %}
-                <option value="{{ sprint.id }}">{{ sprint.nom }}</option>
-              {% endfor %}
-            </select>
-            <label>Afegir qualificació</label>
-          </div>
-        </div>
-
-        <div class="row">
-          {% for quali in equip.qualificacions.all %}
-            <div class="col s12 m6">
-              <div class="card blue-grey darken-1">
-                <div class="card-content white-text">
-                  <span class="card-title">{{ quali.sprint.nom }}</span>
-                  <table class="striped">
-                    <thead>
-                      <tr>
-                        <th>Mòdul professional</th>
-                        <th>Hores planificades</th>
-                        <th>Hores completades</th>
-                        <th>Percentatge</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for dada in quali.percentatges_mps %}
-                        <tr>
-                          <td>{{ dada.obj }}</td>
-                          <td>{{ dada.total }}</td>
-                          <td>{{ dada.done|floatformat:1 }}</td>
-                          <td>{{ dada.percentatge_text }}%</td>
-                        </tr>
-                      {% empty %}
-                        <tr>
-                          <td colspan="4">-</td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-                <div class="card-action">
-                  <a href="#modal1" class="modal-trigger" onclick="edita_qualificacio({{ quali.id }})">Editar</a>
-                  <a href="#" onclick="elimina_qualificacio({{ quali.id }}); return false;">Eliminar</a>
-                </div>
-              </div>
-            </div>
-          {% empty %}
-            <p class="grey-text">Encara no hi ha cap qualificació per aquest equip.</p>
-          {% endfor %}
-        </div>
-      {% empty %}
-        <div class="card-panel">Aquest projecte encara no té equips.</div>
-      {% endfor %}
+    <div class="actions">
+      <a class="btn" href="{% url 'descarrega_qualificacions' projecte.id %}">{% icon "download" %}Descarrega ODS</a>
     </div>
   {% endif %}
 </div>
 
-<div style="display:none;">{% csrf_token %}</div>
+{% if not projecte_fixat %}
+  <form method="get" class="form-stack">
+    <div class="field">
+      <label for="projecte">Projecte</label>
+      <select class="input" name="projecte_id" id="projecte" onchange="this.form.submit()">
+        <option value="">--- tria un projecte ---</option>
+        {% for proj in projectes %}
+          <option value="{{ proj.id }}" {% if projecte and proj.id == projecte.id %}selected{% endif %}>
+            {{ proj.nom }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+{% endif %}
 
-<div id="modal1" class="modal modal-fixed-footer">
-  <div class="modal-content">
-    <h4 id="modal-equip">Equip</h4>
-    <div id="modal-membres" class="grey-text"></div>
-    <ul class="collection" id="modal-specs"></ul>
-    <div class="input-field">
-      <textarea id="comentaris" class="materialize-textarea"></textarea>
+{% if projecte %}
+  <div class="toolbar">
+    {% if not projecte_fixat %}<h2 class="grow">Projecte: {{ projecte.nom }}</h2>{% endif %}
+    <label class="check">
+      <input type="checkbox" id="toggle_members" onclick="toggle_members()">
+      <span>Mostrar / amagar membres</span>
+    </label>
+  </div>
+
+  {% for equip in projecte.equips.all %}
+    <section class="team-block">
+      <div class="team-head">
+        <div>
+          <h2>{{ equip.nom }}</h2>
+          <div class="membersbox" hidden>
+            {% for membre in equip.membres.all %}
+              {{ membre.email }}<br>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="field">
+          <label for="nova-qualificacio-{{ equip.id }}">Afegir qualificació</label>
+          <select class="input" id="nova-qualificacio-{{ equip.id }}" onchange="crea_qualificacio(this, {{ equip.id }})">
+            <option value="">--- afegeix qualificació ---</option>
+            {% for sprint in projecte.sprints.all %}
+              <option value="{{ sprint.id }}">{{ sprint.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grade-grid">
+        {% for quali in equip.qualificacions.all %}
+          <div class="card">
+            <h3 class="card-title">{{ quali.sprint.nom }}</h3>
+            <div class="table-wrap flat">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Mòdul professional</th>
+                    <th>Hores planificades</th>
+                    <th>Hores completades</th>
+                    <th>Percentatge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for dada in quali.percentatges_mps %}
+                    <tr>
+                      <td>{{ dada.obj }}</td>
+                      <td>{{ dada.total }}</td>
+                      <td>{{ dada.done|floatformat:1 }}</td>
+                      <td>{{ dada.percentatge_text }}%</td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="4">-</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="card-actions">
+              <button type="button" class="btn small" onclick="edita_qualificacio({{ quali.id }})">{% icon "edit" %}Editar</button>
+              <button type="button" class="btn small danger" onclick="elimina_qualificacio({{ quali.id }})">{% icon "trash" %}Eliminar</button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="muted">Encara no hi ha cap qualificació per aquest equip.</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% empty %}
+    <div class="empty">Aquest projecte encara no té equips.</div>
+  {% endfor %}
+{% endif %}
+
+<div hidden>{% csrf_token %}</div>
+
+<dialog id="modal1" class="modal wide" aria-labelledby="modal-equip">
+  <div class="modal-header">
+    <h2 id="modal-equip">Equip</h2>
+    <button type="button" class="btn icon-only ghost" data-modal-close aria-label="Tanca">{% icon "close" %}</button>
+  </div>
+  <div class="modal-body">
+    <div id="modal-membres"></div>
+    <ul id="modal-specs"></ul>
+    <div class="field">
       <label for="comentaris">Comentaris del sprint review</label>
+      <textarea class="input" id="comentaris"></textarea>
     </div>
   </div>
   <div class="modal-footer">
-    <a href="#" onclick="guarda_comentari(); return false;" class="waves-effect waves-green btn-flat">Guarda comentari</a>
-    <a href="#!" class="modal-close waves-effect waves-green btn-flat">Tanca</a>
+    <button type="button" class="btn" data-modal-close>Tanca</button>
+    <button type="button" class="btn primary" onclick="guarda_comentari()">Guarda comentari</button>
   </div>
-</div>
+</dialog>
 {% endblock %}
 
 {% block extra_js %}
@@ -322,7 +250,6 @@
         list.innerHTML = "";
         quali.done_specs.forEach(function (ds) {
           var li = document.createElement("li");
-          li.className = "collection-item";
 
           var fila = document.createElement("div");
           fila.className = "spec-fila";
@@ -333,7 +260,7 @@
             document.createTextNode(ds.spec.ordre + ". " + ds.spec.nom + " ")
           );
           var hores = document.createElement("span");
-          hores.className = "teal-text";
+          hores.className = "spec-hores";
           hores.textContent = "[" + ds.spec.hores_estimades + " h]";
           text.appendChild(hores);
           text.appendChild(crea_xips_mps(ds.spec.mp));
@@ -410,11 +337,9 @@
         });
 
         document.getElementById("comentaris").value = quali.comentaris || "";
-        M.textareaAutoResize(document.getElementById("comentaris"));
 
-        var modal = M.Modal.getInstance(document.getElementById("modal1"));
-        modal.options.onCloseEnd = recarrega_vista;
-        modal.open();
+        // Closing the dialog, however it is closed, refreshes the page.
+        UI.openModal(document.getElementById("modal1"), recarrega_vista);
       })
       .catch(function () {
         alert("ERROR accedint a la qualificació de l'equip.");
@@ -505,7 +430,7 @@
           alert("ERROR al guardar el comentari.");
           return;
         }
-        M.toast({ html: "Comentari guardat." });
+        UI.toast("Comentari guardat.");
       })
       .catch(function () {
         alert("ERROR al guardar el comentari.");
@@ -513,7 +438,10 @@
   }
 
   function toggle_members() {
-    $(".membersbox").toggleClass("hide");
+    var mostra = document.getElementById("toggle_members").checked;
+    document.querySelectorAll(".membersbox").forEach(function (caixa) {
+      caixa.hidden = !mostra;
+    });
   }
 </script>
 {% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load icons scrum_extras %}
+
+{% block title %}Tasques bloquejades · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'els_meus_projectes' %}">Els meus projectes</a></p>
+    <h1>Tasques bloquejades</h1>
+    <p class="muted">Totes les tasques que els equips dels teus projectes tenen aturades ara mateix, de la més antiga a la més recent.</p>
+  </div>
+</div>
+
+{% if bloquejos %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Projecte i equip</th>
+          <th>Tasca</th>
+          <th>Motiu</th>
+          <th>Responsable</th>
+          <th>Aturada des de fa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for bloqueig in bloquejos %}
+          <tr>
+            <td>
+              {{ bloqueig.tasca.equip.projecte.nom }}<br>
+              <a class="title" href="{% url 'tauler' bloqueig.tasca.equip.id %}">{{ bloqueig.tasca.equip.nom }}</a>
+            </td>
+            <td>{{ bloqueig.tasca.spec.ordre }}. {{ bloqueig.tasca.spec.nom }}</td>
+            <td>
+              <div class="block-reason">{% icon "slash" %}<span>{{ bloqueig.motiu }}</span></div>
+              <span class="muted">Bloquejada per {{ bloqueig.obert_per|nom_persona }}</span>
+            </td>
+            <td>{{ bloqueig.tasca.responsable|nom_persona }}</td>
+            <td class="dates">{{ bloqueig.obert_el|timesince:ara }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="empty">Ara mateix no hi ha cap tasca bloquejada.</div>
+{% endif %}
+{% endblock %}

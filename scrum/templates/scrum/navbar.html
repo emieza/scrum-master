@@ -1,73 +1,42 @@
-<div class="navbar-fixed">
-  <nav class="light-blue lighten-1" role="navigation">
-    <div class="nav-wrapper container">
-      <a href="{% url 'home' %}" class="brand-logo">Scrum Master</a>
-      <a href="#" data-target="nav-mobile" class="sidenav-trigger"><i class="material-icons">menu</i></a>
+{% load static icons %}
+{% with actual=request.resolver_match.url_name %}
+<header class="topbar">
+  <a href="{% url 'home' %}" class="brand">
+    <img src="{% static 'img/favicon.svg' %}" alt="">Scrum Master
+  </a>
+  <button type="button" class="btn icon-only ghost nav-toggle" data-nav-toggle
+          aria-controls="nav-panel" aria-expanded="false" aria-label="Menú">
+    {% icon "menu" %}
+  </button>
 
-      <ul class="right hide-on-med-and-down">
-        <li><a href="{% url 'projectes' %}"><i class="material-icons left">remove_red_eye</i>Projectes</a></li>
-        <li><a href="{% url 'videos' %}"><i class="material-icons left">ondemand_video</i>Vídeos</a></li>
-
-        {% if user.is_authenticated %}
-          <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons left">assignment</i>Els meus projectes</a></li>
-          <li><a href="{% url 'els_meus_equips' %}"><i class="material-icons left">groups</i>Els meus equips</a></li>
-          {% if user.is_superuser or user.is_staff %}
-            <li><a href="{% url 'qualifica' %}"><i class="material-icons left">task_alt</i>Qualifica</a></li>
-            <li><a href="/admin/"><i class="material-icons left">view_list</i>Administració</a></li>
-          {% endif %}
-          <li><a href="{% url 'perfil' %}"><i class="material-icons left">account_circle</i>Perfil</a></li>
-          <li>
-            <form id="logout-form-desktop" method="post" action="{% url 'account_logout' %}" hidden>
-              {% csrf_token %}
-            </form>
-            <a href="#" data-logout-form="logout-form-desktop" title="Tanca la sessió">
-              <i class="material-icons left">logout</i>{{ user.nom_complert|default:user.email }}
-            </a>
-          </li>
-        {% else %}
-          <li><a href="{% url 'account_signup' %}"><i class="material-icons left">person_add</i>Registra't</a></li>
-          <li><a href="{% url 'account_login' %}"><i class="material-icons left">person</i>Entra</a></li>
+  <div id="nav-panel" class="nav-panel">
+    <nav class="nav" aria-label="Navegació principal">
+      <a href="{% url 'projectes' %}" {% if actual == 'home' or actual == 'projectes' or actual == 'projectes2' or actual == 'projecte' %}aria-current="page"{% endif %}>Projectes</a>
+      <a href="{% url 'videos' %}" {% if actual == 'videos' %}aria-current="page"{% endif %}>Vídeos</a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'els_meus_projectes' %}" {% if actual == 'els_meus_projectes' or actual == 'crea_projecte' or actual == 'edita_projecte' or actual == 'qualifica_projecte' %}aria-current="page"{% endif %}>Els meus projectes</a>
+        <a href="{% url 'els_meus_equips' %}" {% if actual == 'els_meus_equips' or actual == 'crea_equip' or actual == 'edita_equip' %}aria-current="page"{% endif %}>Els meus equips</a>
+        {% if user.is_superuser or user.is_staff %}
+          <a href="{% url 'qualifica' %}" {% if actual == 'qualifica' %}aria-current="page"{% endif %}>Qualifica</a>
+          <a href="/admin/">Administració</a>
         {% endif %}
-      </ul>
+      {% endif %}
+    </nav>
 
-      <ul id="nav-mobile" class="sidenav">
-        <li><a href="{% url 'projectes' %}"><i class="material-icons">remove_red_eye</i>Projectes</a></li>
-        <li><a href="{% url 'videos' %}"><i class="material-icons">ondemand_video</i>Vídeos</a></li>
-        {% if user.is_authenticated %}
-          <li><a href="{% url 'els_meus_projectes' %}"><i class="material-icons">assignment</i>Els meus projectes</a></li>
-          <li><a href="{% url 'els_meus_equips' %}"><i class="material-icons">groups</i>Els meus equips</a></li>
-          {% if user.is_superuser or user.is_staff %}
-            <li><a href="{% url 'qualifica' %}"><i class="material-icons">task_alt</i>Qualifica</a></li>
-            <li><a href="/admin/"><i class="material-icons">view_list</i>Administració</a></li>
-          {% endif %}
-          <li><a href="{% url 'perfil' %}"><i class="material-icons">account_circle</i>Perfil</a></li>
-          <li>
-            <form id="logout-form-mobile" method="post" action="{% url 'account_logout' %}" hidden>
-              {% csrf_token %}
-            </form>
-            <a href="#" data-logout-form="logout-form-mobile" class="sidenav-close">
-              <i class="material-icons">logout</i>Surt
-            </a>
-          </li>
-        {% else %}
-          <li><a href="{% url 'account_signup' %}"><i class="material-icons">person_add</i>Registra't</a></li>
-          <li><a href="{% url 'account_login' %}"><i class="material-icons">person</i>Entra</a></li>
-        {% endif %}
-      </ul>
+    <div class="userbox">
+      {% if user.is_authenticated %}
+        <a class="user-link" href="{% url 'perfil' %}" title="Perfil" {% if actual == 'perfil' %}aria-current="page"{% endif %}>
+          {% icon "user" %}<span>{{ user.nom_complert|default:user.email }}</span>
+        </a>
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn small">Surt</button>
+        </form>
+      {% else %}
+        <a class="btn small ghost" href="{% url 'account_signup' %}">Registra't</a>
+        <a class="btn small" href="{% url 'account_login' %}">Entra</a>
+      {% endif %}
     </div>
-  </nav>
-</div>
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-logout-form]").forEach(function (link) {
-      link.addEventListener("click", function (event) {
-        event.preventDefault();
-        var form = document.getElementById(this.dataset.logoutForm);
-        if (form) {
-          form.submit();
-        }
-      });
-    });
-  });
-</script>
+  </div>
+</header>
+{% endwith %}

@@ -1,0 +1,75 @@
+{% load icons scrum_extras %}
+{% for columna in columnes %}
+  <section class="column {{ columna.estat }}" data-estat="{{ columna.estat }}" aria-label="{{ columna.nom }}">
+    <div class="column-header">
+      <h2>{% estat_icon columna.estat %}{{ columna.nom }}</h2>
+      <span class="count" title="Tasques en aquesta columna">{{ columna.targetes|length }}</span>
+    </div>
+    {% for targeta in columna.targetes %}
+      <article class="task-card {{ targeta.estat }}"
+               data-spec="{{ targeta.spec.id }}"
+               data-estat="{{ targeta.estat }}"
+               data-sprints="{{ targeta.sprint_ids }}">
+        <button type="button" class="task-title" data-obre-tasca="{{ targeta.spec.id }}">
+          <span class="task-num">{{ targeta.spec.ordre }}.</span> {{ targeta.spec.nom }}
+        </button>
+        <div class="chips">
+          {% for sprint in targeta.sprints %}
+            <span class="tag" title="Sprint">{{ sprint.nom }}</span>
+          {% empty %}
+            <span class="tag" title="Sense sprint assignat">Backlog</span>
+          {% endfor %}
+          {% for mp in targeta.moduls %}
+            <span class="chip" title="{{ mp }}">{{ mp }}</span>
+          {% endfor %}
+        </div>
+        {% if not public %}
+          {% if targeta.motiu %}
+            <div class="block-reason">{% icon "slash" %}<span>{{ targeta.motiu }}</span></div>
+          {% endif %}
+          <div class="task-footer">
+            <span class="who">
+              {% if targeta.responsable %}
+                <span class="avatar" aria-hidden="true">{{ targeta.responsable|inicials }}</span>
+                <span>{{ targeta.responsable|nom_persona }}</span>
+                {% if targeta.colaboradors %}
+                  <span class="tag" title="Col·laboradors: {% for persona in targeta.colaboradors %}{{ persona|nom_persona }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ targeta.colaboradors|length }}</span>
+                {% endif %}
+              {% else %}
+                <span>Sense responsable</span>
+              {% endif %}
+            </span>
+          </div>
+          {% if targeta.qualificat is not None %}
+            <p class="task-grade" title="Percentatge posat pel professorat a la qualificació">
+              Qualificada pel professorat: <strong>{{ targeta.qualificat|floatformat:"-1" }}%</strong>
+            </p>
+          {% endif %}
+          {% if targeta.finalitzada_el %}
+            <p class="task-done">Finalitzada el {{ targeta.finalitzada_el|date:"j \d\e M Y, H:i" }}</p>
+          {% endif %}
+        {% endif %}
+        <div class="task-stats">
+          <span title="Hores estimades">{% icon "clock" %}{{ targeta.spec.hores_estimades|floatformat:"-1" }} {% if targeta.spec.hores_estimades == 1 %}hora{% else %}hores{% endif %}</span>
+          {% if not public %}
+            <span title="Comentaris de seguiment">{% icon "comment" %}{{ targeta.n_comentaris }}<span class="sr-only"> comentaris</span></span>
+          {% endif %}
+        </div>
+        {% if not public %}
+          {% if pot_editar and targeta.transicions %}
+            <div class="task-move" data-edicio>
+              <select class="input" data-mou="{{ targeta.spec.id }}" aria-label="Mou la tasca {{ targeta.spec.ordre }} a…">
+                <option value="">Mou a…</option>
+                {% for estat, nom in targeta.transicions %}
+                  <option value="{{ estat }}">{{ nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        {% endif %}
+      </article>
+    {% empty %}
+      <p class="column-empty">Cap tasca</p>
+    {% endfor %}
+  </section>
+{% endfor %}

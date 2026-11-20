@@ -1,295 +1,243 @@
 {% extends "base.html" %}
+{% load icons %}
 
 {% block title %}{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %} · Scrum Master{% endblock %}
 
 {% block extra_head %}{{ descripcio_form.media }}{% endblock %}
 
-{% block extra_css %}
-#centre-resultats,
-#cicle-resultats,
-#spec-mp-resultats,
-#spec-sprints-resultats,
-#spec-edit-mp-resultats,
-#spec-edit-sprints-resultats {
-  position: relative;
-  z-index: 10;
-  margin-top: -1rem;
-}
-.spec-chips {
-  margin: 0.25rem 0 1rem;
-}
-.spec-chip {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  margin: 0.2rem;
-  border-radius: 16px;
-  background-color: #e0e0e0;
-}
-.spec-chip button {
-  border: 0;
-  background: none;
-  cursor: pointer;
-  margin-left: 0.35rem;
-  font-weight: bold;
-}
-.spec-hores-input {
-  width: 6rem;
-  height: 2.2rem;
-  margin: 0;
-  padding: 0 0.5rem;
-  border: 1px solid #9e9e9e;
-  border-radius: 4px;
-  box-sizing: border-box;
-  text-align: right;
-}
-.spec-hores-input:focus {
-  border-bottom: 1px solid #26a69a;
-  box-shadow: 0 1px 0 0 #26a69a;
-}
-.spec-hores-input:disabled {
-  opacity: 0.6;
-}
-{% endblock %}
-
 {% block content %}
-<div class="container">
-  <div class="section">
-    <h2>{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %}</h2>
-    {% if projecte %}<h3 id="projecte-nom">{{ projecte.nom }}</h3>{% endif %}
-    <p class="grey-text">
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'els_meus_projectes' %}">Els meus projectes</a></p>
+    <h1>{% if projecte %}Edita el projecte{% else %}Nou projecte{% endif %}</h1>
+    {% if projecte %}<h2 id="projecte-nom">{{ projecte.nom }}</h2>{% endif %}
+    <p class="muted">
       {% if projecte %}
         Modifica les dades del projecte «{{ projecte.nom }}».
       {% else %}
         Crea un projecte ABP. Tu seràs administrador del projecte.
       {% endif %}
     </p>
-
-    <div id="ajax-missatge" class="card-panel ajax-missatge" style="display: none;"></div>
-
-    {% if errors %}
-      <div class="card-panel red lighten-4">
-        <ul class="browser-default">
-          {% for error in errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
-
-    <form method="post"{% if projecte %} data-ajax-form data-ajax-projecte data-ajax-missatge="#ajax-missatge"{% endif %}>
-      {% csrf_token %}
-
-      <div class="input-field">
-        <input type="text" name="nom" id="nom" value="{{ dades.nom }}" maxlength="255" required>
-        <label for="nom" {% if dades.nom %}class="active"{% endif %}>Nom del projecte</label>
-      </div>
-
-      <p class="grey-text">Descripció (opcional)</p>
-      {{ descripcio_form.descripcio }}
-
-      <div class="input-field">
-        <input type="text" id="centre-cerca" autocomplete="off" value="{{ dades.centre_nom }}">
-        <input type="hidden" name="centre" id="centre" value="{{ dades.centre }}">
-        <label for="centre-cerca" class="active">Centre (opcional)</label>
-      </div>
-      <ul id="centre-resultats" class="collection" style="display: none;"></ul>
-      <p class="grey-text">
-        Cerca el centre pel nom o la població i selecciona'l de la llista.
-      </p>
-
-      <div class="input-field">
-        <input type="text" id="cicle-cerca" autocomplete="off" value="{{ dades.cicle_nom }}">
-        <input type="hidden" name="cicle" id="cicle" value="{{ dades.cicle }}">
-        <label for="cicle-cerca" class="active">Cicle (opcional)</label>
-      </div>
-      <ul id="cicle-resultats" class="collection" style="display: none;"></ul>
-      <p class="grey-text">
-        Cerca el cicle pel nom o el codi i selecciona'l de la llista.
-      </p>
-
-      <div class="row">
-        <div class="input-field col s12 m6">
-          <input type="date" name="inici" id="inici" value="{{ dades.inici }}" required>
-          <label for="inici" class="active">Data d'inici</label>
-        </div>
-        <div class="input-field col s12 m6">
-          <input type="date" name="final" id="final" value="{{ dades.final }}" required>
-          <label for="final" class="active">Data final</label>
-        </div>
-      </div>
-
-      <button class="btn waves-effect waves-light" type="submit">
-        <i class="material-icons left">save</i>{% if projecte %}Desa els canvis{% else %}Crea el projecte{% endif %}
-      </button>
-    </form>
-
-    {% if projecte %}
-      <div class="divider" style="margin: 2.5rem 0;"></div>
-
-      <h4>Sprints</h4>
-      <p class="grey-text">
-        Crea i edita les iteracions d'aquest projecte.
-      </p>
-
-      <div id="sprints-llistat">
-        {% include "scrum/_sprint_llistat.html" %}
-      </div>
-
-      <div class="card blue-grey lighten-5">
-        <div class="card-content">
-          <div id="sprint-missatge-nou" class="card-panel ajax-missatge" style="display: none;"></div>
-          <span class="card-title">Nou sprint</span>
-          <form method="post" action="{% url 'crea_sprint' projecte.id %}" data-ajax-form data-ajax-desti="#sprints-llistat" data-ajax-missatge="#sprint-missatge-nou">
-            {% csrf_token %}
-            <div class="row">
-              <div class="input-field col s12 m4">
-                <input type="text" name="nom" id="sprint-nou-nom" maxlength="255" required>
-                <label for="sprint-nou-nom">Nom del sprint</label>
-              </div>
-              <div class="input-field col s12 m4">
-                <input type="date" name="inici" id="sprint-nou-inici"
-                       value="{{ sprint_inici }}" required>
-                <label for="sprint-nou-inici" class="active">Data d'inici</label>
-              </div>
-              <div class="input-field col s12 m4">
-                <input type="date" name="final" id="sprint-nou-final"
-                       value="{{ sprint_final }}" required>
-                <label for="sprint-nou-final" class="active">Data final</label>
-              </div>
-            </div>
-            <button class="btn waves-effect waves-light" type="submit">
-              <i class="material-icons left">add</i>Afegeix el sprint
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div class="divider" style="margin: 2.5rem 0;"></div>
-
-      <h4>Specs</h4>
-      <p class="grey-text">
-        Històries o especificacions del producte d'aquest projecte.
-      </p>
-
-      <div id="specs-missatge" class="card-panel ajax-missatge" style="display: none;"></div>
-
-      <div id="specs-llistat"{% if projecte %} data-reordena-url="{% url 'reordena_specs' projecte.id %}"{% endif %}>
-        {% include "scrum/_specs_llistat.html" %}
-      </div>
-
-      <div id="spec-edicio-contenidor" hidden>
-        <form id="spec-edicio-form"
-              class="spec-edicio-form"
-              method="post"
-              action=""
-              data-ajax-form
-              data-ajax-desti="#specs-llistat"
-              data-ajax-missatge="#specs-missatge"
-              data-ajax-spec-edit>
-          {% csrf_token %}
-          <div class="row">
-            <div class="input-field col s12 m2">
-              <input type="number" name="ordre" id="spec-edit-ordre"
-                     min="0" required>
-              <label for="spec-edit-ordre" class="active">Ordre</label>
-            </div>
-            <div class="input-field col s12 m7">
-              <input type="text" name="nom" id="spec-edit-nom"
-                     maxlength="600" required>
-              <label for="spec-edit-nom" class="active">Nom de la spec</label>
-            </div>
-            <div class="input-field col s12 m3">
-              <input type="number" name="hores_estimades" id="spec-edit-hores"
-                     min="0" step="0.5" required>
-              <label for="spec-edit-hores" class="active">Hores estimades</label>
-            </div>
-          </div>
-
-          <p class="grey-text">Descripció (opcional)</p>
-          {{ spec_edit_descripcio_form.descripcio }}
-
-          <div class="row">
-            <div class="col s12 m6">
-              <div class="input-field">
-                <input type="text" id="spec-edit-mp-cerca" autocomplete="off">
-                <label for="spec-edit-mp-cerca" class="active">Mòduls professionals</label>
-              </div>
-              <ul id="spec-edit-mp-resultats" class="collection" style="display: none;"></ul>
-              <div id="spec-edit-mp-seleccionats" class="spec-chips"></div>
-            </div>
-            <div class="col s12 m6">
-              <div class="input-field">
-                <input type="text" id="spec-edit-sprints-cerca" autocomplete="off">
-                <label for="spec-edit-sprints-cerca" class="active">Sprints</label>
-              </div>
-              <ul id="spec-edit-sprints-resultats" class="collection" style="display: none;"></ul>
-              <div id="spec-edit-sprints-seleccionats" class="spec-chips"></div>
-            </div>
-          </div>
-
-          <button class="btn waves-effect waves-light" type="submit">
-            <i class="material-icons left" aria-hidden="true">save</i>Desa la spec
-          </button>
-          <button class="btn-flat waves-effect" type="button" id="spec-edicio-cancela">
-            Cancel·la
-          </button>
-        </form>
-      </div>
-
-      <div class="card blue-grey lighten-5">
-        <div class="card-content">
-          <div id="spec-missatge-nou" class="card-panel ajax-missatge" style="display: none;"></div>
-          <span class="card-title">Nova spec</span>
-          <form method="post" action="{% url 'crea_spec' projecte.id %}" data-ajax-form data-ajax-desti="#specs-llistat" data-ajax-missatge="#spec-missatge-nou" data-ajax-spec>
-            {% csrf_token %}
-            <div class="row">
-              <div class="input-field col s12 m3">
-                <input type="number" name="ordre" id="spec-nou-ordre"
-                       value="{{ ordre_nova_spec }}" min="0" required>
-                <label for="spec-nou-ordre" class="active">Ordre</label>
-              </div>
-              <div class="input-field col s12 m6">
-                <input type="text" name="nom" id="spec-nou-nom" maxlength="600" required>
-                <label for="spec-nou-nom">Nom de la spec</label>
-              </div>
-              <div class="input-field col s12 m3">
-                <input type="number" name="hores_estimades" id="spec-nou-hores"
-                       value="0" min="0" step="0.5" required>
-                <label for="spec-nou-hores" class="active">Hores estimades</label>
-              </div>
-            </div>
-
-            <p class="grey-text">Descripció (opcional)</p>
-            {{ spec_descripcio_form.descripcio }}
-
-            <div class="row">
-              <div class="col s12 m6">
-                <div class="input-field">
-                  <input type="text" id="spec-mp-cerca" autocomplete="off">
-                  <label for="spec-mp-cerca" class="active">Mòduls professionals</label>
-                </div>
-                <ul id="spec-mp-resultats" class="collection" style="display: none;"></ul>
-                <div id="spec-mp-seleccionats" class="spec-chips"></div>
-              </div>
-              <div class="col s12 m6">
-                <div class="input-field">
-                  <input type="text" id="spec-sprints-cerca" autocomplete="off">
-                  <label for="spec-sprints-cerca" class="active">Sprints</label>
-                </div>
-                <ul id="spec-sprints-resultats" class="collection" style="display: none;"></ul>
-                <div id="spec-sprints-seleccionats" class="spec-chips"></div>
-              </div>
-            </div>
-
-            <button class="btn waves-effect waves-light" type="submit">
-              <i class="material-icons left">add</i>Afegeix la spec
-            </button>
-          </form>
-        </div>
-      </div>
-    {% endif %}
   </div>
 </div>
+
+<div id="ajax-missatge" class="notice ajax-missatge" role="status" hidden></div>
+
+{% if errors %}
+  <div class="notice error" role="alert">
+    <ul>
+      {% for error in errors %}
+        <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<form method="post" class="card"{% if projecte %} data-ajax-form data-ajax-projecte data-ajax-missatge="#ajax-missatge"{% endif %}>
+  {% csrf_token %}
+
+  <div class="field">
+    <label for="nom">Nom del projecte</label>
+    <input class="input" type="text" name="nom" id="nom" value="{{ dades.nom }}" maxlength="255" required>
+  </div>
+
+  <p class="field-label">Descripció (opcional)</p>
+  {{ descripcio_form.descripcio }}
+
+  <div class="form-row">
+    <div>
+      <div class="field">
+        <label for="centre-cerca">Centre (opcional)</label>
+        <input class="input" type="text" id="centre-cerca" autocomplete="off" value="{{ dades.centre_nom }}" aria-describedby="centre-ajuda">
+        <input type="hidden" name="centre" id="centre" value="{{ dades.centre }}">
+        <p id="centre-ajuda" class="hint">Cerca el centre pel nom o la població i selecciona'l de la llista.</p>
+      </div>
+      <ul id="centre-resultats" class="suggestion-list" hidden></ul>
+    </div>
+    <div>
+      <div class="field">
+        <label for="cicle-cerca">Cicle (opcional)</label>
+        <input class="input" type="text" id="cicle-cerca" autocomplete="off" value="{{ dades.cicle_nom }}" aria-describedby="cicle-ajuda">
+        <input type="hidden" name="cicle" id="cicle" value="{{ dades.cicle }}">
+        <p id="cicle-ajuda" class="hint">Cerca el cicle pel nom o el codi i selecciona'l de la llista.</p>
+      </div>
+      <ul id="cicle-resultats" class="suggestion-list" hidden></ul>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="inici">Data d'inici</label>
+      <input class="input" type="date" name="inici" id="inici" value="{{ dades.inici }}" required>
+    </div>
+    <div class="field">
+      <label for="final">Data final</label>
+      <input class="input" type="date" name="final" id="final" value="{{ dades.final }}" required>
+    </div>
+  </div>
+
+  <input type="hidden" name="insignies_presents" value="1">
+  <label class="check">
+    <input type="checkbox" name="insignies_visibles" {% if dades.insignies_visibles %}checked{% endif %}>
+    <span>Mostra les insígnies de treball en equip a l'alumnat (el professorat les veu sempre)</span>
+  </label>
+
+  <button class="btn primary" type="submit">
+    {% icon "save" %}{% if projecte %}Desa els canvis{% else %}Crea el projecte{% endif %}
+  </button>
+</form>
+
+{% if projecte %}
+  <div class="section-header">
+    <h2>Sprints</h2>
+    <p class="muted">Crea i edita les iteracions d'aquest projecte.</p>
+  </div>
+
+  <div id="sprints-llistat" class="stack">
+    {% include "scrum/_sprint_llistat.html" %}
+  </div>
+
+  <div class="card muted-card" style="margin-top: 16px;">
+    <div id="sprint-missatge-nou" class="notice ajax-missatge" role="status" hidden></div>
+    <h3 class="card-title">Nou sprint</h3>
+    <form method="post" action="{% url 'crea_sprint' projecte.id %}" data-ajax-form data-ajax-desti="#sprints-llistat" data-ajax-missatge="#sprint-missatge-nou">
+      {% csrf_token %}
+      <div class="form-row">
+        <div class="field">
+          <label for="sprint-nou-nom">Nom del sprint</label>
+          <input class="input" type="text" name="nom" id="sprint-nou-nom" maxlength="255" required>
+        </div>
+        <div class="field">
+          <label for="sprint-nou-inici">Data d'inici</label>
+          <input class="input" type="date" name="inici" id="sprint-nou-inici"
+                 value="{{ sprint_inici }}" required>
+        </div>
+        <div class="field">
+          <label for="sprint-nou-final">Data final</label>
+          <input class="input" type="date" name="final" id="sprint-nou-final"
+                 value="{{ sprint_final }}" required>
+        </div>
+      </div>
+      <button class="btn primary" type="submit">{% icon "plus" %}Afegeix el sprint</button>
+    </form>
+  </div>
+
+  <div class="section-header">
+    <h2>Specs</h2>
+    <p class="muted">Històries o especificacions del producte d'aquest projecte.</p>
+  </div>
+
+  <div id="specs-missatge" class="notice ajax-missatge" role="status" hidden></div>
+
+  <div id="specs-llistat"{% if projecte %} data-reordena-url="{% url 'reordena_specs' projecte.id %}"{% endif %}>
+    {% include "scrum/_specs_llistat.html" %}
+  </div>
+
+  <div id="spec-edicio-contenidor" hidden>
+    <form id="spec-edicio-form"
+          class="spec-edicio-form"
+          method="post"
+          action=""
+          data-ajax-form
+          data-ajax-desti="#specs-llistat"
+          data-ajax-missatge="#specs-missatge"
+          data-ajax-spec-edit>
+      {% csrf_token %}
+      <div class="form-row spec-main">
+        <div class="field">
+          <label for="spec-edit-ordre">Ordre</label>
+          <input class="input" type="number" name="ordre" id="spec-edit-ordre"
+                 min="0" required>
+        </div>
+        <div class="field">
+          <label for="spec-edit-nom">Nom de la spec</label>
+          <input class="input" type="text" name="nom" id="spec-edit-nom"
+                 maxlength="600" required>
+        </div>
+        <div class="field">
+          <label for="spec-edit-hores">Hores estimades</label>
+          <input class="input" type="number" name="hores_estimades" id="spec-edit-hores"
+                 min="0" step="0.5" required>
+        </div>
+      </div>
+
+      <p class="field-label">Descripció (opcional)</p>
+      {{ spec_edit_descripcio_form.descripcio }}
+
+      <div class="form-row">
+        <div>
+          <div class="field">
+            <label for="spec-edit-mp-cerca">Mòduls professionals</label>
+            <input class="input" type="text" id="spec-edit-mp-cerca" autocomplete="off">
+          </div>
+          <ul id="spec-edit-mp-resultats" class="suggestion-list" hidden></ul>
+          <div id="spec-edit-mp-seleccionats" class="spec-chips"></div>
+        </div>
+        <div>
+          <div class="field">
+            <label for="spec-edit-sprints-cerca">Sprints</label>
+            <input class="input" type="text" id="spec-edit-sprints-cerca" autocomplete="off">
+          </div>
+          <ul id="spec-edit-sprints-resultats" class="suggestion-list" hidden></ul>
+          <div id="spec-edit-sprints-seleccionats" class="spec-chips"></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" type="submit">{% icon "save" %}Desa la spec</button>
+        <button class="btn" type="button" id="spec-edicio-cancela">Cancel·la</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card muted-card" style="margin-top: 16px;">
+    <div id="spec-missatge-nou" class="notice ajax-missatge" role="status" hidden></div>
+    <h3 class="card-title">Nova spec</h3>
+    <form method="post" action="{% url 'crea_spec' projecte.id %}" data-ajax-form data-ajax-desti="#specs-llistat" data-ajax-missatge="#spec-missatge-nou" data-ajax-spec>
+      {% csrf_token %}
+      <div class="form-row spec-main">
+        <div class="field">
+          <label for="spec-nou-ordre">Ordre</label>
+          <input class="input" type="number" name="ordre" id="spec-nou-ordre"
+                 value="{{ ordre_nova_spec }}" min="0" required>
+        </div>
+        <div class="field">
+          <label for="spec-nou-nom">Nom de la spec</label>
+          <input class="input" type="text" name="nom" id="spec-nou-nom" maxlength="600" required>
+        </div>
+        <div class="field">
+          <label for="spec-nou-hores">Hores estimades</label>
+          <input class="input" type="number" name="hores_estimades" id="spec-nou-hores"
+                 value="0" min="0" step="0.5" required>
+        </div>
+      </div>
+
+      <p class="field-label">Descripció (opcional)</p>
+      {{ spec_descripcio_form.descripcio }}
+
+      <div class="form-row">
+        <div>
+          <div class="field">
+            <label for="spec-mp-cerca">Mòduls professionals</label>
+            <input class="input" type="text" id="spec-mp-cerca" autocomplete="off">
+          </div>
+          <ul id="spec-mp-resultats" class="suggestion-list" hidden></ul>
+          <div id="spec-mp-seleccionats" class="spec-chips"></div>
+        </div>
+        <div>
+          <div class="field">
+            <label for="spec-sprints-cerca">Sprints</label>
+            <input class="input" type="text" id="spec-sprints-cerca" autocomplete="off">
+          </div>
+          <ul id="spec-sprints-resultats" class="suggestion-list" hidden></ul>
+          <div id="spec-sprints-seleccionats" class="spec-chips"></div>
+        </div>
+      </div>
+
+      <button class="btn primary" type="submit">{% icon "plus" %}Afegeix la spec</button>
+    </form>
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -307,7 +255,7 @@
 
     function netejaResultats() {
       resultats.innerHTML = "";
-      resultats.style.display = "none";
+      resultats.hidden = true;
     }
 
     function mostraResultats(centres) {
@@ -315,8 +263,7 @@
 
       centres.forEach(function (centre) {
         var item = document.createElement("li");
-        item.className = "collection-item";
-        item.style.cursor = "pointer";
+        item.className = "suggestion-item";
         item.textContent = centre.label;
         item.addEventListener("click", function () {
           hidden.value = centre.id;
@@ -327,7 +274,7 @@
       });
 
       if (centres.length) {
-        resultats.style.display = "block";
+        resultats.hidden = false;
       }
     }
 
@@ -381,7 +328,7 @@
 
     function netejaResultats() {
       resultats.innerHTML = "";
-      resultats.style.display = "none";
+      resultats.hidden = true;
     }
 
     function mostraResultats(cicles) {
@@ -389,8 +336,7 @@
 
       cicles.forEach(function (cicle) {
         var item = document.createElement("li");
-        item.className = "collection-item";
-        item.style.cursor = "pointer";
+        item.className = "suggestion-item";
         item.textContent = cicle.label;
         item.addEventListener("click", function () {
           hidden.value = cicle.id;
@@ -401,7 +347,7 @@
       });
 
       if (cicles.length) {
-        resultats.style.display = "block";
+        resultats.hidden = false;
       }
     }
 
@@ -456,7 +402,7 @@
 
       function netejaResultats() {
         resultats.innerHTML = "";
-        resultats.style.display = "none";
+        resultats.hidden = true;
       }
 
       function afegeix(item) {
@@ -491,8 +437,7 @@
 
         items.forEach(function (item) {
           var element = document.createElement("li");
-          element.className = "collection-item";
-          element.style.cursor = "pointer";
+          element.className = "suggestion-item";
           element.textContent = item.label;
           element.addEventListener("click", function () {
             afegeix(item);
@@ -503,7 +448,7 @@
         });
 
         if (items.length) {
-          resultats.style.display = "block";
+          resultats.hidden = false;
         }
       }
 
@@ -588,7 +533,7 @@
     function netejaMissatges() {
       document.querySelectorAll(".ajax-missatge").forEach(function (element) {
         element.innerHTML = "";
-        element.style.display = "none";
+        element.hidden = true;
       });
     }
 
@@ -599,8 +544,8 @@
       netejaMissatges();
       element.innerHTML = "";
       element.textContent = text;
-      element.className = "card-panel green lighten-4";
-      element.style.display = "block";
+      element.className = "notice success ajax-missatge";
+      element.hidden = false;
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
@@ -610,16 +555,15 @@
       }
       netejaMissatges();
       element.innerHTML = "";
-      element.className = "card-panel red lighten-4";
+      element.className = "notice error ajax-missatge";
       var llista = document.createElement("ul");
-      llista.className = "browser-default";
       (errors || ["No s'ha pogut desar els canvis."]).forEach(function (error) {
         var item = document.createElement("li");
         item.textContent = error;
         llista.appendChild(item);
       });
       element.appendChild(llista);
-      element.style.display = "block";
+      element.hidden = false;
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
@@ -649,7 +593,7 @@
       var cella = document.createElement("td");
       cella.colSpan = 6;
       var missatge = document.createElement("div");
-      missatge.className = "card-panel green lighten-4 spec-notificacio";
+      missatge.className = "notice success spec-notificacio";
       missatge.setAttribute("role", "status");
       missatge.textContent = text;
       cella.appendChild(missatge);
@@ -808,26 +752,6 @@
       return filesSpec().map(grup);
     }
 
-    function filaSpecPer(element) {
-      var fila = element.closest("tr[data-spec-id]");
-      if (fila) {
-        return fila;
-      }
-      var descripcio = element.closest("tr[data-spec-descripcio]");
-      if (descripcio) {
-        return descripcio.previousElementSibling;
-      }
-      return null;
-    }
-
-    function netejaIndicadors() {
-      contenidor
-        .querySelectorAll(".spec-drop-abans, .spec-drop-apres")
-        .forEach(function (fila) {
-          fila.classList.remove("spec-drop-abans", "spec-drop-apres");
-        });
-    }
-
     function actualitzaZebra() {
       filesSpec().forEach(function (fila, index) {
         var classe =
@@ -849,14 +773,13 @@
         return;
       }
       document.querySelectorAll(".ajax-missatge").forEach(function (element) {
-        element.style.display = "none";
+        element.hidden = true;
       });
       missatge.innerHTML = "";
       missatge.className =
-        "card-panel ajax-missatge " +
-        (error ? "red lighten-4" : "green lighten-4");
+        "notice ajax-missatge " + (error ? "error" : "success");
       missatge.textContent = text;
-      missatge.style.display = "block";
+      missatge.hidden = false;
     }
 
     function desaOrdre() {
@@ -927,81 +850,212 @@
         });
     }
 
-    contenidor.addEventListener("dragstart", function (event) {
-      if (event.target.closest(".spec-hores-input")) {
-        event.preventDefault();
+    // ---- Dragging a spec to another position --------------------------------
+    // Done with pointer events, not the browser's own drag and drop, so the
+    // same code serves a mouse, a pen and a finger. A finger drags by the
+    // handle (the dots at the start of the row), which starts at once; a
+    // mouse can also pull the row from anywhere that is not a control.
+    //
+    // A table row cannot be made bigger or given a shadow, so what is carried
+    // is a floating copy of the row. While it is carried the other specs
+    // slide out of its way and a blue slot shows where it would land. The
+    // sliding is done on the cells (through --desplaca), not on the rows:
+    // every browser moves a table cell, which is not true of a table row.
+    var PULL_PX = 5; // Mouse: how far a row is pulled before it lifts.
+    var SIDEWAYS = 0.35; // How much of the sideways movement the copy follows.
+    var SIDEWAYS_MAX = 36;
+    var GLIDE_MS = 170;
+    var drag = null;
+    var pendent = null; // { fila, pointerId, x, y }: a mouse press that may become a drag.
+
+    function esControl(element) {
+      return Boolean(
+        element.closest("input, button, a, select, textarea, summary, label, .ck, .spec-edicio-fila")
+      );
+    }
+
+    function creaFlotant(nodes) {
+      var taula = contenidor.querySelector("table");
+      var caixa = nodes[0].getBoundingClientRect();
+      var flotant = document.createElement("table");
+      flotant.className = taula.className + " spec-flotant";
+      flotant.setAttribute("aria-hidden", "true");
+      var cos = document.createElement("tbody");
+      nodes.forEach(function (node) {
+        var copia = node.cloneNode(true);
+        copia.removeAttribute("data-spec-id");
+        copia.removeAttribute("data-spec-descripcio");
+        // Outside its table a row loses its column widths: keep them.
+        Array.prototype.forEach.call(node.children, function (cella, index) {
+          copia.children[index].style.width = cella.getBoundingClientRect().width + "px";
+        });
+        cos.appendChild(copia);
+      });
+      flotant.appendChild(cos);
+      flotant.style.left = caixa.left + "px";
+      flotant.style.top = caixa.top + "px";
+      flotant.style.width = caixa.width + "px";
+      document.body.appendChild(flotant);
+      return flotant;
+    }
+
+    function desplaca(item, distancia) {
+      if (item.desplacat === distancia) {
         return;
       }
-      var fila = event.target.closest("tr[data-spec-id]");
-      if (!fila || desant) {
-        event.preventDefault();
+      item.desplacat = distancia;
+      item.nodes.forEach(function (node) {
+        node.style.setProperty("--desplaca", distancia + "px");
+      });
+    }
+
+    // Where everything goes for the current pointer position. Positions are
+    // measured inside the list when the drag starts, so they stay right
+    // while the page scrolls under the pointer.
+    function segueix() {
+      var dx = Math.max(-SIDEWAYS_MAX, Math.min(SIDEWAYS_MAX, (drag.x - drag.startX) * SIDEWAYS));
+      drag.flotant.style.transform = "translate(" + dx + "px, " + (drag.y - drag.startY) + "px)";
+
+      // A spec above gives way when the carried one passes its middle going
+      // up, and a spec below when it is passed going down.
+      var propi = drag.items[drag.from];
+      var centre = propi.mig + (drag.y + window.scrollY - drag.startPagina);
+      var a = drag.from;
+      var dalt = propi.dalt;
+      drag.items.forEach(function (item, index) {
+        if (index === drag.from) {
+          return;
+        }
+        var distancia = 0;
+        if (index < drag.from && centre < item.mig) {
+          distancia = propi.alt;
+          a -= 1;
+          dalt -= item.alt;
+        } else if (index > drag.from && centre > item.mig) {
+          distancia = -propi.alt;
+          a += 1;
+          dalt += item.alt;
+        }
+        desplaca(item, distancia);
+      });
+      drag.a = a;
+      drag.daltForat = dalt;
+      drag.forat.style.top = dalt + "px";
+    }
+
+    // Near the top or the bottom of the window the page scrolls by itself.
+    function desplacaSol() {
+      if (!drag || drag.acabant) {
+        return;
+      }
+      var vora = 70;
+      var pas = 0;
+      if (drag.y < vora) {
+        pas = -Math.ceil((vora - drag.y) / 6);
+      } else if (drag.y > window.innerHeight - vora) {
+        pas = Math.ceil((drag.y - (window.innerHeight - vora)) / 6);
+      }
+      if (pas) {
+        window.scrollBy(0, pas);
+        segueix();
+      }
+      drag.frame = requestAnimationFrame(desplacaSol);
+    }
+
+    function comenca(fila, pointerId, x, y) {
+      if (desant || drag) {
         return;
       }
       document.dispatchEvent(new CustomEvent("spec-tanca-editor"));
-      arrossegada = fila;
+      contenidor.querySelectorAll(".spec-notificacio-fila").forEach(function (notificacio) {
+        notificacio.remove();
+      });
+      var embolcall = contenidor.querySelector(".table-wrap");
+      if (!fila.isConnected || !embolcall) {
+        return;
+      }
       htmlInicial = contenidor.innerHTML;
-      fila.classList.add("spec-arrossegada");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", fila.getAttribute("data-spec-id"));
-    });
+      arrossegada = fila;
 
-    contenidor.addEventListener("dragover", function (event) {
-      var fila = filaSpecPer(event.target);
-      if (!fila || !arrossegada || fila === arrossegada || desant) {
-        return;
-      }
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      netejaIndicadors();
-      var rectangle = fila.getBoundingClientRect();
-      if (event.clientY < rectangle.top + rectangle.height / 2) {
-        fila.classList.add("spec-drop-abans");
-      } else {
-        fila.classList.add("spec-drop-apres");
-      }
-    });
-
-    contenidor.addEventListener("dragleave", function (event) {
-      if (!contenidor.contains(event.relatedTarget)) {
-        netejaIndicadors();
-      }
-    });
-
-    contenidor.addEventListener("drop", function (event) {
-      var desti = filaSpecPer(event.target);
-      if (!desti || !arrossegada || desti === arrossegada || desant) {
-        netejaIndicadors();
-        return;
-      }
-      event.preventDefault();
-
-      var inserirAbans = desti.classList.contains("spec-drop-abans");
-      var tots = grups();
-      var idArrossegat = arrossegada.getAttribute("data-spec-id");
-      var idDesti = desti.getAttribute("data-spec-id");
-      var origen = tots.findIndex(function (item) {
-        return item.id === idArrossegat;
+      // Every spec (its row and, if it has one, its description row),
+      // measured inside the box that holds the table.
+      var marc = embolcall.getBoundingClientRect();
+      var items = grups().map(function (item) {
+        var primer = item.nodes[0].getBoundingClientRect();
+        var darrer = item.nodes[item.nodes.length - 1].getBoundingClientRect();
+        var dalt = primer.top - marc.top + embolcall.scrollTop;
+        var alt = darrer.bottom - primer.top;
+        return { id: item.id, nodes: item.nodes, dalt: dalt, alt: alt, mig: dalt + alt / 2, desplacat: 0 };
       });
-      var destiIndex = tots.findIndex(function (item) {
-        return item.id === idDesti;
+      var from = items.findIndex(function (item) {
+        return item.nodes[0] === fila;
       });
-
-      netejaIndicadors();
-      if (origen === -1 || destiIndex === -1 || origen === destiIndex) {
+      if (from === -1) {
         return;
       }
 
-      var mogut = tots.splice(origen, 1)[0];
-      var posicio = destiIndex + (inserirAbans ? 0 : 1);
-      if (origen < destiIndex) {
-        posicio -= 1;
-      }
-      tots.splice(posicio, 0, mogut);
+      var flotant = creaFlotant(items[from].nodes);
+      // The blue slot: the place the carried spec would take.
+      var forat = document.createElement("div");
+      forat.className = "spec-slot";
+      forat.setAttribute("aria-hidden", "true");
+      forat.style.top = items[from].dalt + "px";
+      forat.style.height = items[from].alt + "px";
+      embolcall.appendChild(forat);
 
+      items[from].nodes.forEach(function (node) {
+        node.classList.add("spec-arrossegada");
+      });
+      contenidor.classList.add("sorting");
+      document.body.classList.add("reordering");
+      drag = {
+        fila: fila,
+        items: items,
+        from: from,
+        a: from,
+        flotant: flotant,
+        forat: forat,
+        embolcall: embolcall,
+        daltForat: items[from].dalt,
+        pointerId: pointerId,
+        x: x,
+        y: y,
+        startX: x,
+        startY: y,
+        startPagina: y + window.scrollY,
+        frame: null,
+        acabant: false
+      };
+      try {
+        fila.setPointerCapture(pointerId);
+      } catch (error) {
+        // A pointer the browser no longer knows: the drag simply never moves.
+      }
+      drag.frame = requestAnimationFrame(desplacaSol);
+    }
+
+    // Leaves the table as it was before the drag, without any animation.
+    function neteja(acabat) {
+      contenidor.classList.remove("sorting");
+      acabat.items.forEach(function (item) {
+        item.nodes.forEach(function (node) {
+          node.style.removeProperty("--desplaca");
+          node.classList.remove("spec-arrossegada");
+        });
+      });
+      acabat.flotant.remove();
+      acabat.forat.remove();
+      document.body.classList.remove("reordering");
+    }
+
+    // Puts the spec that was at `from` at position `a` and saves the order.
+    function reordena(items, from, a) {
       var tbody = contenidor.querySelector("tbody");
-      if (!tbody) {
+      if (!tbody || from === a) {
         return;
       }
+      var tots = items.slice();
+      tots.splice(a, 0, tots.splice(from, 1)[0]);
       tots.forEach(function (item) {
         item.nodes.forEach(function (node) {
           tbody.appendChild(node);
@@ -1009,14 +1063,119 @@
       });
       actualitzaZebra();
       desaOrdre();
+    }
+
+    // `confirma` is false when the drag is cancelled (Escape, or the system
+    // taking the pointer away). Either way the carried spec glides into the
+    // slot (its new place, or the one it came from) before the table changes.
+    function acaba(confirma) {
+      if (!drag || drag.acabant) {
+        return;
+      }
+      var acabat = drag;
+      acabat.acabant = true;
+      cancelAnimationFrame(acabat.frame);
+      var a = confirma && !desant ? acabat.a : acabat.from;
+      if (a === acabat.from) {
+        acabat.items.forEach(function (item) {
+          desplaca(item, 0);
+        });
+        acabat.daltForat = acabat.items[acabat.from].dalt;
+        acabat.forat.style.top = acabat.daltForat + "px";
+      }
+      // The click that ends a drag must not press anything under it.
+      var empassa = function (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      };
+      window.addEventListener("click", empassa, { capture: true, once: true });
+      setTimeout(function () {
+        window.removeEventListener("click", empassa, { capture: true });
+      }, 50);
+
+      // Glide to the slot, wherever the page has scrolled to meanwhile.
+      var marc = acabat.embolcall.getBoundingClientRect();
+      var desti = marc.top + acabat.daltForat - acabat.embolcall.scrollTop;
+      acabat.flotant.classList.add("settling");
+      acabat.flotant.style.transform =
+        "translate(0px, " + (desti - parseFloat(acabat.flotant.style.top)) + "px)";
+
+      var senseMoviment = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      setTimeout(function () {
+        neteja(acabat);
+        drag = null;
+        arrossegada = null;
+        reordena(acabat.items, acabat.from, a);
+      }, senseMoviment ? 0 : GLIDE_MS);
+    }
+
+    contenidor.addEventListener("pointerdown", function (event) {
+      if (drag || pendent || desant || (event.pointerType === "mouse" && event.button !== 0)) {
+        return;
+      }
+      var fila = event.target.closest("tr[data-spec-id]");
+      if (!fila) {
+        return;
+      }
+      if (event.target.closest(".spec-drag-handle")) {
+        // The handle starts the drag at once, with a mouse or a finger.
+        event.preventDefault();
+        comenca(fila, event.pointerId, event.clientX, event.clientY);
+        return;
+      }
+      // Away from the handle only a mouse drags, and only once it is pulled:
+      // a finger there scrolls the page, and a click still reaches the row.
+      if (event.pointerType !== "mouse" || esControl(event.target)) {
+        return;
+      }
+      pendent = { fila: fila, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     });
 
-    contenidor.addEventListener("dragend", function () {
-      if (arrossegada) {
-        arrossegada.classList.remove("spec-arrossegada");
+    // While a spec is carried by a finger the page must not scroll under it.
+    contenidor.addEventListener("touchmove", function (event) {
+      if (drag && event.cancelable) {
+        event.preventDefault();
       }
-      arrossegada = null;
-      netejaIndicadors();
+    }, { passive: false });
+
+    document.addEventListener("pointermove", function (event) {
+      if (drag && event.pointerId === drag.pointerId) {
+        if (!drag.acabant) {
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          segueix();
+        }
+        return;
+      }
+      if (!pendent || event.pointerId !== pendent.pointerId) {
+        return;
+      }
+      if (Math.hypot(event.clientX - pendent.x, event.clientY - pendent.y) > PULL_PX) {
+        var inici = pendent;
+        pendent = null;
+        comenca(inici.fila, inici.pointerId, inici.x, inici.y);
+        if (drag) {
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          segueix();
+        }
+      }
+    });
+
+    function fiPunter(event) {
+      if (pendent && event.pointerId === pendent.pointerId) {
+        pendent = null;
+      }
+      if (drag && event.pointerId === drag.pointerId) {
+        acaba(event.type === "pointerup");
+      }
+    }
+    document.addEventListener("pointerup", fiPunter);
+    document.addEventListener("pointercancel", fiPunter);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && drag) {
+        acaba(false);
+      }
     });
   })();
   (function () {
@@ -1090,7 +1249,7 @@
         }
         if (resultats) {
           resultats.innerHTML = "";
-          resultats.style.display = "none";
+          resultats.hidden = true;
         }
       });
     }
@@ -1192,11 +1351,8 @@
     }
 
     function mostraMissatge(text, error) {
-      if (window.M && M.toast) {
-        M.toast({
-          html: text,
-          classes: error ? "red" : "green"
-        });
+      if (window.UI) {
+        UI.toast(text, error ? "error" : "info");
         return;
       }
       if (error) {

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load icons %}
+
+{% block title %}Matriu de progrés · {{ projecte.nom }} · Scrum Master{% endblock %}
+
+{% block main_class %}wide{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'els_meus_projectes' %}">Els meus projectes</a> / {{ projecte.nom }}</p>
+    <h1>Matriu de progrés</h1>
+    <p class="muted">L'estat de cada tasca al tauler de cada equip. Fes clic en un equip per obrir-ne el tauler.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'insignies_projecte' projecte.id %}">{% icon "award" %}Insígnies</a>
+    <a class="btn" href="{% url 'tasques_bloquejades' %}">{% icon "slash" %}Tasques bloquejades</a>
+  </div>
+</div>
+
+{% if files and specs %}
+  {# What the colours of the cells mean, at the right end of the row above the table. #}
+  <div class="toolbar">
+    <div class="legend">
+      {% for estat, nom in llegenda %}
+        <span class="status {{ estat }}">{% estat_icon estat %}{{ nom }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="matrix-wrap">
+    <table class="matrix" id="matriu">
+      <thead>
+        <tr>
+          <th class="group-head" scope="col">Equip</th>
+          {% for spec in specs %}
+            <th scope="col" title="{{ spec.ordre }}. {{ spec.nom }}">
+              <span class="col-title">{{ spec.nom }}</span>
+              <span class="col-num">{{ spec.ordre }}</span>
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in files %}
+          <tr>
+            <th class="group-head" scope="row">
+              <a href="{% url 'tauler' fila.equip.id %}"><strong>{{ fila.equip.nom }}</strong></a>
+              <small>{{ fila.progres.comptes.finalitzat }} de {{ fila.progres.total }} finalitzades ({{ fila.progres.percent }}%)</small>
+            </th>
+            {% for cella in fila.celles %}
+              <td>
+                <span class="cell {{ cella.estat }}" title="{{ cella.spec.ordre }}. {{ cella.spec.nom }}: {{ cella.nom_estat }}">
+                  {% estat_icon cella.estat %}<span class="sr-only">{{ cella.nom_estat }}</span>
+                </span>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% elif not files %}
+  <div class="empty">Aquest projecte encara no té equips.</div>
+{% else %}
+  <div class="empty">Aquest projecte encara no té specs.</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Only the page scrolls up and down. Once the header of the matrix has
+  // scrolled out, its bottom strip (the task numbers) is kept in view just
+  // under the top bar, down to the last row. A box that scrolls sideways
+  // cannot use "sticky" against the page, so the header is pushed down by
+  // the distance it would otherwise be hidden (--stick).
+  (function () {
+    var taula = document.getElementById("matriu");
+    if (!taula || !taula.tHead || !taula.tBodies.length) {
+      return;
+    }
+    var cap = taula.tHead;
+    var barra = document.querySelector(".topbar");
+
+    function enganxa() {
+      var numero = cap.querySelector(".col-num");
+      if (!numero) {
+        return;
+      }
+      var franja = cap.getBoundingClientRect().height - (numero.offsetTop - 6);
+      var sota = barra ? barra.getBoundingClientRect().bottom : 0;
+      var amagat = sota - (taula.getBoundingClientRect().top + cap.offsetHeight - franja);
+      var darrera = taula.tBodies[0].lastElementChild;
+      var maxim = taula.offsetHeight - cap.offsetHeight - (darrera ? darrera.offsetHeight : 0);
+      var distancia = Math.max(0, Math.min(amagat, maxim));
+      taula.style.setProperty("--stick", Math.round(distancia) + "px");
+      taula.classList.toggle("stuck", distancia > 0);
+    }
+
+    var frame = null;
+    function programa() {
+      if (frame === null) {
+        frame = requestAnimationFrame(function () {
+          frame = null;
+          enganxa();
+        });
+      }
+    }
+    window.addEventListener("scroll", programa, { passive: true });
+    window.addEventListener("resize", programa);
+    enganxa();
+  })();
+</script>
+{% endblock %}

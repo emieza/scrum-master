@@ -1,131 +1,152 @@
 {% extends "base.html" %}
-{% load scrum_extras %}
+{% load scrum_extras icons %}
 
 {% block title %}{{ projecte.nom }} · Scrum Master{% endblock %}
 
-{% block extra_css %}
-.collection-header { background-color: #b3e5fc !important; }
-.comment-box { border-bottom: 1px solid #cfd8dc; }
-.comment-form, .comment-container { display: none; }
-.anchor { color: #000; }
-.back-link { display: flow-root; }
-{% endblock %}
-
 {% block content %}
-<div class="container">
-  <div class="section">
-    <div class="back-link">
-      <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
-    </div>
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'projectes' %}">Projectes</a></p>
+    <h1>{{ projecte.nom }}</h1>
+    <p class="meta">
+      <span>Centre: <strong>{{ projecte.centre }}</strong></span>
+      <span>Cicle: <strong>{{ projecte.cicle|default:"—" }}</strong></span>
+      <span>Inici: {{ projecte.inici }}</span>
+      <span>Final: {{ projecte.final }}</span>
+    </p>
+  </div>
+</div>
 
-    <div class="row">
-      <div class="col s12 m8">
-        <div class="card-panel light-blue lighten-4">
-          <h3>{{ projecte.nom }}</h3>
-          <p>Centre: <b>{{ projecte.centre }}</b></p>
-          <p>Cicle: <b>{{ projecte.cicle|default:"—" }}</b></p>
-          <p>Inici: {{ projecte.inici }}</p>
-          <p>Final: {{ projecte.final }}</p>
-        </div>
-      </div>
-      <div class="col s12 m4">
-        <div class="card-panel light-blue lighten-4">
-          <h5>Continguts</h5>
-          <ul class="collection">
-            <a class="collection-item" href="#moduls-professionals">Mòduls professionals</a>
-            <a class="collection-item" href="#descripcio">Descripció</a>
-            {% for sprint in projecte.sprints.all %}
-              <a class="collection-item" href="#sprint-{{ sprint.id }}">{{ sprint.nom }}</a>
-            {% endfor %}
-            {% if specs_backlog %}
-              <a class="collection-item" href="#backlog">Resta del backlog</a>
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-panel light-blue lighten-4">
-      <h4><a class="anchor" id="moduls-professionals">Mòduls professionals implicats</a></h4>
-      {% for mp in mps %}
-        {{ mp.nom }}<br>
-      {% empty %}
-        <span class="grey-text">Encara no s'ha assignat cap mòdul a les specs.</span>
-      {% endfor %}
-    </div>
-
-    <div class="card-panel light-blue lighten-4">
-      <h4><a class="anchor" id="descripcio">Descripció</a></h4>
-      <div class="rich-text">{{ projecte.descripcio|safe }}</div>
-    </div>
-
-    {% for sprint in projecte.sprints.all %}
-      <ul class="collection with-header">
-        <li class="collection-header">
-          <h4><a class="anchor" id="sprint-{{ sprint.id }}">{{ sprint.nom }}</a></h4>
-          <p>Inici: {{ sprint.inici }}</p>
-          <p>Final: {{ sprint.final }}</p>
-          <p>Hores estimades totals: {{ sprint.hores|floatformat }}</p>
-          <ul>
-            {% for mp, dades_mp in sprint.dades_mps.items %}
-              <li>
-                {{ mp }}: {{ dades_mp.specs }} specs
-                ({{ dades_mp.percent_specs|floatformat }}%),
-                {{ dades_mp.hores|floatformat }} hores
-                ({{ dades_mp.percent_hores|floatformat }}%)
-              </li>
-            {% endfor %}
-          </ul>
-        </li>
-
-        {% for spec in sprint.specs.all %}
-          {% include "scrum/_spec_item.html" with sprint_id=sprint.id %}
+<div class="project-layout">
+  <div class="project-main">
+    <section class="card" aria-labelledby="moduls-professionals">
+      <h2 id="moduls-professionals">Mòduls professionals implicats</h2>
+      <ul class="plain-list">
+        {% for mp in mps %}
+          <li>{{ mp.nom }}</li>
+        {% empty %}
+          <li class="muted">Encara no s'ha assignat cap mòdul a les specs.</li>
         {% endfor %}
       </ul>
+    </section>
+
+    <section class="card" aria-labelledby="descripcio">
+      <h2 id="descripcio">Descripció</h2>
+      <div class="rich-text">{{ projecte.descripcio|safe }}</div>
+    </section>
+
+    {% for sprint in projecte.sprints.all %}
+      <section class="card sprint-card" aria-labelledby="sprint-{{ sprint.id }}">
+        <div class="sprint-head">
+          <h2 id="sprint-{{ sprint.id }}">{{ sprint.nom }}</h2>
+          <p class="meta">
+            <span>Inici: {{ sprint.inici }}</span>
+            <span>Final: {{ sprint.final }}</span>
+            <span>Hores estimades totals: {{ sprint.hores|floatformat }}</span>
+          </p>
+          {% if sprint.dades_mps %}
+            <ul>
+              {% for mp, dades_mp in sprint.dades_mps.items %}
+                <li>
+                  {{ mp }}: {{ dades_mp.specs }} specs
+                  ({{ dades_mp.percent_specs|floatformat }}%),
+                  {{ dades_mp.hores|floatformat }} hores
+                  ({{ dades_mp.percent_hores|floatformat }}%)
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+        <ul class="spec-list">
+          {% for spec in sprint.specs.all %}
+            {% include "scrum/_spec_item.html" with sprint_id=sprint.id %}
+          {% endfor %}
+        </ul>
+      </section>
     {% empty %}
-      <div class="card-panel">
-        Aquest projecte encara no té cap sprint definit.
-      </div>
+      <div class="empty">Aquest projecte encara no té cap sprint definit.</div>
     {% endfor %}
 
     {% if specs_backlog %}
-      <ul class="collection with-header">
-        <li class="collection-header">
-          <h4><a class="anchor" id="backlog">Resta del backlog</a></h4>
-        </li>
-        {% for spec in specs_backlog %}
-          {% include "scrum/_spec_item.html" %}
-        {% endfor %}
-      </ul>
+      <section class="card sprint-card" aria-labelledby="backlog">
+        <div class="sprint-head">
+          <h2 id="backlog">Resta del backlog</h2>
+        </div>
+        <ul class="spec-list">
+          {% for spec in specs_backlog %}
+            {% include "scrum/_spec_item.html" %}
+          {% endfor %}
+        </ul>
+      </section>
     {% endif %}
 
-    <div class="back-link">
-      <a href="{% url 'projectes' %}"><i class="material-icons left">arrow_back</i>Tornar a la llista de projectes</a>
-    </div>
+    <p><a href="{% url 'projectes' %}">{% icon "arrow-left" %} Tornar a la llista de projectes</a></p>
   </div>
+
+  <nav class="card toc" aria-labelledby="continguts">
+    <h2 id="continguts">Continguts</h2>
+    <ul>
+      <li><a href="#moduls-professionals">Mòduls professionals</a></li>
+      <li><a href="#descripcio">Descripció</a></li>
+      {% for sprint in projecte.sprints.all %}
+        <li><a href="#sprint-{{ sprint.id }}">{{ sprint.nom }}</a></li>
+      {% endfor %}
+      {% if specs_backlog %}
+        <li><a href="#backlog">Resta del backlog</a></li>
+      {% endif %}
+    </ul>
+
+    <h2 class="toc-section">Taulers Kanban</h2>
+    <ul>
+      {% for equip in equips %}
+        <li><a href="{% url 'tauler' equip.id %}">{{ equip.nom }}</a></li>
+      {% empty %}
+        <li class="muted toc-empty">Encara no hi ha equips.</li>
+      {% endfor %}
+    </ul>
+    {% if mostra_insignies or pot_gestionar %}
+      <div class="stack-sm">
+        {% if mostra_insignies %}
+          <a class="btn small" href="{% url 'insignies_projecte' projecte.id %}">{% icon "award" %}Insígnies</a>
+        {% endif %}
+        {% if pot_gestionar %}
+          <a class="btn small" href="{% url 'matriu_projecte' projecte.id %}">{% icon "grid" %}Matriu de progrés</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </nav>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  function toggle_add_comment(sprintId, specId) {
-    var elem = $("#comment-form-" + sprintId + "-" + specId);
-    if (elem.css("display") === "none") {
-      $(".comment-form").css("display", "none");
-      elem.css("display", "block");
-    } else {
-      elem.css("display", "none");
+  // Shows one panel of a kind ("comment-form" or "comment-container") at a
+  // time and keeps the button's aria-expanded state in sync.
+  function toggle_panel(prefix, classe, sprintId, specId) {
+    var elem = document.getElementById(prefix + "-" + sprintId + "-" + specId);
+    if (!elem) {
+      return;
+    }
+    var obre = elem.hidden;
+    document.querySelectorAll("." + classe).forEach(function (altre) {
+      altre.hidden = true;
+    });
+    document.querySelectorAll('[data-toggle="' + classe + '"]').forEach(function (boto) {
+      boto.setAttribute("aria-expanded", "false");
+    });
+    elem.hidden = !obre;
+    var boto = document.querySelector('[aria-controls="' + elem.id + '"]');
+    if (boto) {
+      boto.setAttribute("aria-expanded", obre ? "true" : "false");
     }
   }
 
+  function toggle_add_comment(sprintId, specId) {
+    toggle_panel("comment-form", "comment-form", sprintId, specId);
+  }
+
   function toggle_read_comment(sprintId, specId) {
-    var elem = $("#comment-container-" + sprintId + "-" + specId);
-    if (elem.css("display") === "none") {
-      $(".comment-container").css("display", "none");
-      elem.css("display", "block");
-    } else {
-      elem.css("display", "none");
-    }
+    toggle_panel("comment-container", "comment-container", sprintId, specId);
   }
 
   {% if toggled_comment %}
