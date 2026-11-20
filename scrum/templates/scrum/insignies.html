@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load icons %}
+
+{% block title %}Insígnies · {{ projecte.nom }} · Scrum Master{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'projecte' projecte.id %}">{{ projecte.nom }}</a> / Insígnies</p>
+    <h1>Insígnies de treball en equip</h1>
+    <p class="muted">
+      No hi ha classificació ni podi: les insígnies premien com es reparteix la feina,
+      no qui va més de pressa. Qualsevol equip les pot aconseguir totes.
+    </p>
+  </div>
+  {% if pot_gestionar %}
+    <div class="actions">
+      <a class="btn" href="{% url 'matriu_projecte' projecte.id %}">{% icon "grid" %}Matriu de progrés</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if pot_gestionar and not projecte.insignies_visibles %}
+  <div class="notice">
+    L'alumnat no veu aquesta pàgina: «Mostra les insígnies a l'alumnat» està desactivat a
+    <a href="{% url 'edita_projecte' projecte.id %}">Edita el projecte</a>.
+  </div>
+{% endif %}
+
+<div class="ranking">
+  <div class="rank-hero">
+    <div class="rank-hero-title">
+      <span class="rank-trophy" aria-hidden="true">🤝</span>
+      <div>
+        <h2>{{ projecte.nom }}</h2>
+        <p>{{ files|length }} equip{{ files|length|pluralize }}</p>
+      </div>
+    </div>
+    <div class="rank-goal">
+      <div class="rank-goal-text">
+        <strong>{{ mitjana }}%</strong>
+        <span>de mitjana de tasques finalitzades</span>
+      </div>
+      <div class="rank-bar"><span class="rank-fill" style="width: {{ mitjana }}%"></span></div>
+      <div class="rank-goal-badges">{{ aconseguides }} de {{ possibles }} insígnies aconseguides entre tots els equips</div>
+    </div>
+  </div>
+
+  <ul class="rank-list">
+    {% for fila in files %}
+      <li class="rank-row{% if fila.meu %} mine{% endif %}">
+        <div class="rank-head">
+          <div class="rank-title">
+            <a href="{% url 'tauler' fila.equip.id %}">{{ fila.equip.nom }}</a>
+            {% if fila.meu %}<span class="rank-level">El teu equip</span>{% endif %}
+          </div>
+          <div class="rank-count">
+            <strong>{{ fila.aconseguides }}</strong> de {{ fila.possibles }} insígnies
+          </div>
+        </div>
+        <div class="rank-progress">
+          <div class="rank-bar-wrap">
+            <div class="progress" role="img"
+                 aria-label="{% for barra in fila.barres %}{{ barra.nom }}: {{ barra.n }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+              {% for barra in fila.barres %}
+                <span class="{{ barra.estat }}" style="width: {{ barra.ample|floatformat:2 }}%" title="{{ barra.nom }}: {{ barra.n }}"></span>
+              {% endfor %}
+            </div>
+            <span class="rank-average" style="left: {{ mitjana }}%" title="Mitjana de la classe: {{ mitjana }}%"></span>
+          </div>
+          <span>{{ fila.comptes.finalitzat }} de {{ fila.total }} finalitzades ({{ fila.percent }}%)</span>
+        </div>
+        <ul class="badge-list">
+          {% for insignia in fila.insignies %}
+            <li class="badge {% if insignia.no_disponible %}unavailable{% elif insignia.aconseguida %}earned{% else %}locked{% endif %}">
+              <span class="badge-icon" aria-hidden="true">{{ insignia.icona }}</span>
+              <span class="badge-text">
+                <strong>{{ insignia.nom }}</strong>
+                <span>
+                  {% if insignia.no_disponible %}
+                    No disponible: {{ insignia.no_disponible }}
+                  {% elif insignia.aconseguida %}
+                    <span class="badge-check">✓ Aconseguida</span> · {{ insignia.progres }}
+                  {% else %}
+                    {{ insignia.progres }}
+                  {% endif %}
+                </span>
+                <details class="badge-how">
+                  <summary>Com s'aconsegueix</summary>
+                  {{ insignia.com }}
+                </details>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </li>
+    {% empty %}
+      <li class="empty">Aquest projecte encara no té equips.</li>
+    {% endfor %}
+  </ul>
+
+  <p class="muted rank-legend">
+    <span class="rank-average-key" aria-hidden="true"></span>La marca vertical de cada barra és la mitjana de la classe.
+    Les insígnies es calculen sobre les tasques finalitzades fins ara, es compten per a la persona
+    responsable de cada tasca i es poden perdre si l'equip deixa de treballar així.
+    Mostren com es registra la feina; no en mesuren la qualitat.
+  </p>
+</div>
+{% endblock %}

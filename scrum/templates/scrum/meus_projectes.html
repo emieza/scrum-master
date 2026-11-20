@@ -10,6 +10,7 @@
     <p class="muted">Projectes que administres.</p>
   </div>
   <div class="actions">
+    <a class="btn" href="{% url 'tasques_bloquejades' %}">{% icon "slash" %}Tasques bloquejades</a>
     <a class="btn primary" href="{% url 'crea_projecte' %}">{% icon "plus" %}Nou projecte</a>
   </div>
 </div>
@@ -42,6 +43,7 @@
             <div class="icon-actions">
               <a class="btn small" title="Visualitza el projecte" href="{% url 'projecte' projecte.id %}">{% icon "eye" %}Visualitza</a>
               <a class="btn small" title="Edita el projecte" href="{% url 'edita_projecte' projecte.id %}">{% icon "edit" %}Edita</a>
+              <a class="btn small" title="Matriu de progrés dels taulers Kanban" href="{% url 'matriu_projecte' projecte.id %}">{% icon "grid" %}Seguiment</a>
               <a class="btn small" title="Qualifica el projecte" href="{% url 'qualifica_projecte' projecte.id %}">{% icon "check" %}Qualifica</a>
               <form method="post" action="{% url 'elimina_projecte' projecte.id %}"
                     onsubmit="return confirm('Segur que vols eliminar aquest projecte?');">

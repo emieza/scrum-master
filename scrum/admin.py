@@ -20,6 +20,10 @@ from .models import (
     Spec,
     SpecFeedback,
     Sprint,
+    TascaBloqueig,
+    TascaComentari,
+    TascaEquip,
+    TascaEvent,
     User,
 )
 from .widgets import Base64CKEditor5Widget
@@ -364,6 +368,50 @@ class ModulProfessionalAdmin(admin.ModelAdmin):
     ordering = ("cicle", "numero")
 
 
+class _NomesLectura:
+    """Inline de consulta: l'historial del tauler no es modifica."""
+
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class TascaComentariInline(_NomesLectura, admin.TabularInline):
+    model = TascaComentari
+    fields = ("creat_el", "autor", "text")
+    readonly_fields = fields
+
+
+class TascaBloqueigInline(_NomesLectura, admin.TabularInline):
+    model = TascaBloqueig
+    fields = ("obert_el", "obert_per", "motiu", "tancat_el", "tancat_per")
+    readonly_fields = fields
+
+
+class TascaEventInline(_NomesLectura, admin.TabularInline):
+    model = TascaEvent
+    fields = ("creat_el", "usuari", "tipus", "estat_origen", "estat_desti", "afectat", "text")
+    readonly_fields = fields
+
+
+class TascaEquipAdmin(admin.ModelAdmin):
+    """Tauler Kanban: consulta de l'estat i de l'historial de cada tasca."""
+
+    model = TascaEquip
+    list_display = ("spec", "equip", "estat", "responsable", "finalitzada_el")
+    list_filter = ("estat", "equip__projecte")
+    search_fields = ("spec__nom", "equip__nom", "responsable__email")
+    list_select_related = ("spec", "equip", "responsable")
+    raw_id_fields = ("equip", "spec", "responsable", "enviada_a_test_per", "validada_per")
+    filter_horizontal = ("colaboradors",)
+    inlines = [TascaBloqueigInline, TascaComentariInline, TascaEventInline]
+
+
 class UserAdmin(BaseUserAdmin):
     model = User
     list_display = (
@@ -407,3 +455,4 @@ admin.site.register(Spec, SpecAdmin)
 admin.site.register(Qualificacio, QualificacioAdmin)
 admin.site.register(SpecFeedback, SpecFeedbackAdmin)
 admin.site.register(User, UserAdmin)
+admin.site.register(TascaEquip, TascaEquipAdmin)

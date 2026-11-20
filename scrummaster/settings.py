@@ -21,6 +21,7 @@ env = environ.Env(
     MICROSOFT_OAUTH_TENANT=(str, "common"),
     GITHUB_OAUTH_CLIENT_ID=(str, ""),
     GITHUB_OAUTH_CLIENT_SECRET=(str, ""),
+    KANBAN_POLL_SECONDS=(int, 60),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -203,5 +204,9 @@ CKEDITOR_5_FILE_UPLOAD_PERMISSION = "staff"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Every how many seconds an open Kanban board asks the server whether
+# something changed. 0 switches the automatic refresh off.
+KANBAN_POLL_SECONDS = max(0, env("KANBAN_POLL_SECONDS"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

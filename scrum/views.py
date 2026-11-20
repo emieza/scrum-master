@@ -19,6 +19,7 @@ from odf.style import Style, TableCellProperties, TextProperties
 from odf.table import Table, TableCell, TableRow
 from odf.text import P
 
+from . import views_kanban
 from .forms import ProjecteDescripcioForm, SpecDescripcioForm
 from .models import (
     Centre,
@@ -97,6 +98,7 @@ def _clona_projecte(projecte, nom, usuari, reseteja_hores_estimades=False):
         cicle=projecte.cicle,
         inici=avui,
         final=avui + durada_projecte,
+        insignies_visibles=projecte.insignies_visibles,
     )
     nou.admins.add(usuari)
 
@@ -306,6 +308,11 @@ def projecte(request, id):
             ).order_by("ordre", "id"),
             "toggled_comment": toggled_comment,
             "activa_comentaris": activa_comentaris,
+            "equips": projecte.equips.order_by("nom", "id"),
+            "pot_gestionar": views_kanban._pot_gestionar(request.user, projecte),
+            "mostra_insignies": views_kanban._pot_veure_insignies(
+                request.user, projecte
+            ),
         },
     )
 
@@ -581,6 +588,7 @@ def _projecte_form(request, projecte=None):
             "cicle_nom": "",
             "inici": avui.isoformat(),
             "final": (avui + datetime.timedelta(days=30)).isoformat(),
+            "insignies_visibles": True,
         }
     else:
         dades = {
@@ -592,6 +600,7 @@ def _projecte_form(request, projecte=None):
             "cicle_nom": str(projecte.cicle) if projecte.cicle_id else "",
             "inici": projecte.inici.isoformat(),
             "final": projecte.final.isoformat(),
+            "insignies_visibles": projecte.insignies_visibles,
         }
     errors = []
 
@@ -600,6 +609,10 @@ def _projecte_form(request, projecte=None):
             dades[camp] = request.POST.get(camp, "").strip()
         if "centre" not in request.POST and request.user.centre_id:
             dades["centre"] = str(request.user.centre_id)
+        # Una casella desmarcada no s'envia: el camp ocult diu que el
+        # formulari la portava, i sense ell es conserva el valor que hi havia.
+        if "insignies_presents" in request.POST:
+            dades["insignies_visibles"] = "insignies_visibles" in request.POST
 
         centre = None
         if dades["centre"]:
@@ -646,6 +659,7 @@ def _projecte_form(request, projecte=None):
                     cicle=cicle,
                     inici=inici,
                     final=final,
+                    insignies_visibles=dades["insignies_visibles"],
                 )
                 projecte.admins.add(request.user)
                 missatge = "Projecte «{}» creat correctament.".format(projecte.nom)
@@ -656,6 +670,7 @@ def _projecte_form(request, projecte=None):
                 projecte.cicle = cicle
                 projecte.inici = inici
                 projecte.final = final
+                projecte.insignies_visibles = dades["insignies_visibles"]
                 projecte.save()
                 missatge = "Projecte «{}» actualitzat correctament.".format(
                     projecte.nom

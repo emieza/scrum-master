@@ -20,6 +20,7 @@
       <div class="card-header">
         <h2 class="card-title">{{ equip.nom }}</h2>
         <div class="btn-row">
+          <a class="btn small primary" href="{% url 'tauler' equip.id %}">{% icon "columns" %}Tauler Kanban</a>
           <a class="btn small" href="{% url 'projecte' equip.projecte.id %}">{% icon "eye" %}Anar al projecte</a>
           <a class="btn small" href="{% url 'edita_equip' equip.id %}">{% icon "edit" %}Editar equip</a>
         </div>

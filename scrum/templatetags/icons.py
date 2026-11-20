@@ -64,6 +64,17 @@ ICONS = {
     ),
     "search": '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
     "video": '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+    "circle": '<circle cx="12" cy="12" r="10"/>',
+    "slash": '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
+    "award": '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    "grid": (
+        '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>'
+        '<rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'
+    ),
+    "columns": (
+        '<path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14'
+        'a2 2 0 0 0 2 2h7m0-18v18"/>'
+    ),
     "list": (
         '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>'
         '<line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>'
@@ -81,3 +92,18 @@ SVG = (
 @register.simple_tag
 def icon(name):
     return mark_safe(SVG.format(ICONS[name]))
+
+
+# Icona de cada estat del tauler Kanban: l'estat mai es distingeix només pel color.
+ICONA_ESTAT = {
+    "pendent": "circle",
+    "en_curs": "clock",
+    "bloquejat": "slash",
+    "test": "eye",
+    "finalitzat": "check",
+}
+
+
+@register.simple_tag
+def estat_icon(estat):
+    return icon(ICONA_ESTAT.get(estat, "circle"))

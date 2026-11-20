@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load icons %}
+
+{% block title %}Matriu de progrés · {{ projecte.nom }} · Scrum Master{% endblock %}
+
+{% block main_class %}wide{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="titles">
+    <p class="breadcrumb"><a href="{% url 'els_meus_projectes' %}">Els meus projectes</a> / {{ projecte.nom }}</p>
+    <h1>Matriu de progrés</h1>
+    <p class="muted">L'estat de cada tasca al tauler de cada equip. Fes clic en un equip per obrir-ne el tauler.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'insignies_projecte' projecte.id %}">{% icon "award" %}Insígnies</a>
+    <a class="btn" href="{% url 'tasques_bloquejades' %}">{% icon "slash" %}Tasques bloquejades</a>
+  </div>
+</div>
+
+{% if files and specs %}
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="group-head" scope="col">Equip</th>
+          {% for spec in specs %}
+            <th scope="col" title="{{ spec.ordre }}. {{ spec.nom }}">
+              <span class="col-title">{{ spec.nom }}</span>
+              <span class="col-num">{{ spec.ordre }}</span>
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in files %}
+          <tr>
+            <th class="group-head" scope="row">
+              <a href="{% url 'tauler' fila.equip.id %}"><strong>{{ fila.equip.nom }}</strong></a>
+              <small>{{ fila.progres.comptes.finalitzat }} de {{ fila.progres.total }} finalitzades ({{ fila.progres.percent }}%)</small>
+            </th>
+            {% for cella in fila.celles %}
+              <td>
+                <span class="cell {{ cella.estat }}" title="{{ cella.spec.ordre }}. {{ cella.spec.nom }}: {{ cella.nom_estat }}">
+                  {% estat_icon cella.estat %}<span class="sr-only">{{ cella.nom_estat }}</span>
+                </span>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="legend">
+    {% for estat, nom in llegenda %}
+      <span class="status {{ estat }}">{% estat_icon estat %}{{ nom }}</span>
+    {% endfor %}
+  </div>
+{% elif not files %}
+  <div class="empty">Aquest projecte encara no té equips.</div>
+{% else %}
+  <div class="empty">Aquest projecte encara no té specs.</div>
+{% endif %}
+{% endblock %}

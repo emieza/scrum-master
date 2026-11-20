@@ -76,6 +76,12 @@
     </div>
   </div>
 
+  <input type="hidden" name="insignies_presents" value="1">
+  <label class="check">
+    <input type="checkbox" name="insignies_visibles" {% if dades.insignies_visibles %}checked{% endif %}>
+    <span>Mostra les insígnies de treball en equip a l'alumnat (el professorat les veu sempre)</span>
+  </label>
+
   <button class="btn primary" type="submit">
     {% icon "save" %}{% if projecte %}Desa els canvis{% else %}Crea el projecte{% endif %}
   </button>

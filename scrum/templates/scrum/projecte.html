@@ -95,6 +95,25 @@
         <li><a href="#backlog">Resta del backlog</a></li>
       {% endif %}
     </ul>
+
+    <h2 class="toc-section">Taulers Kanban</h2>
+    <ul>
+      {% for equip in equips %}
+        <li><a href="{% url 'tauler' equip.id %}">{{ equip.nom }}</a></li>
+      {% empty %}
+        <li class="muted toc-empty">Encara no hi ha equips.</li>
+      {% endfor %}
+    </ul>
+    {% if mostra_insignies or pot_gestionar %}
+      <div class="stack-sm">
+        {% if mostra_insignies %}
+          <a class="btn small" href="{% url 'insignies_projecte' projecte.id %}">{% icon "award" %}Insígnies</a>
+        {% endif %}
+        {% if pot_gestionar %}
+          <a class="btn small" href="{% url 'matriu_projecte' projecte.id %}">{% icon "grid" %}Matriu de progrés</a>
+        {% endif %}
+      </div>
+    {% endif %}
   </nav>
 </div>
 {% endblock %}
